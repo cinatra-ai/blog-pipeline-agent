@@ -1,0 +1,80 @@
+{
+  "name": "@cinatra-ai/blog-pipeline-agent",
+  "version": "0.1.5",
+  "license": "Apache-2.0",
+  "description": "Parent orchestrator (WayFlow Flow OAS) composing the 4 blog generation agents (idea, draft, image-prompt, linkedin-writer) as child FlowNodes. Manual brief / reference artifacts input only; transcript input is not accepted. projectId threaded across children. No HITL of its own beyond child reviewer gates.",
+  "type": "module",
+  "cinatra": {
+    "apiVersion": "cinatra.ai/v1",
+    "kind": "agent",
+    "dependencies": [
+      {
+        "packageName": "@cinatra-ai/blog-draft-writer-agent",
+        "edgeType": "runtime",
+        "versionConstraint": {
+          "kind": "semver-range",
+          "range": "*"
+        },
+        "requirement": "required",
+        "kind": "agent"
+      },
+      {
+        "packageName": "@cinatra-ai/blog-idea-generator-agent",
+        "edgeType": "runtime",
+        "versionConstraint": {
+          "kind": "semver-range",
+          "range": "*"
+        },
+        "requirement": "required",
+        "kind": "agent"
+      },
+      {
+        "packageName": "@cinatra-ai/blog-image-prompt-agent",
+        "edgeType": "runtime",
+        "versionConstraint": {
+          "kind": "semver-range",
+          "range": "*"
+        },
+        "requirement": "required",
+        "kind": "agent"
+      },
+      {
+        "packageName": "@cinatra-ai/blog-linkedin-writer-agent",
+        "edgeType": "runtime",
+        "versionConstraint": {
+          "kind": "semver-range",
+          "range": "*"
+        },
+        "requirement": "required",
+        "kind": "agent"
+      },
+      {
+        "packageName": "@cinatra-ai/reviewer-agent",
+        "edgeType": "runtime",
+        "versionConstraint": {
+          "kind": "semver-range",
+          "range": "*"
+        },
+        "requirement": "required",
+        "kind": "agent"
+      }
+    ],
+    "packageType": "agent",
+    "manifestVersion": 1,
+    "sourceTemplateId": "blog-pipeline-agent-flow",
+    "sourceVersionId": "b214a0a7-9af1-400e-b084-9bd9d99ed575",
+    "sourceVersionNumber": 1,
+    "type": "flow",
+    "riskLevel": "low",
+    "hasApprovalGates": true,
+    "toolAccess": [],
+    "ownerOrgId": null,
+    "agentDependencies": {
+      "@cinatra-ai/blog-idea-generator-agent": "^0.1.0",
+      "@cinatra-ai/blog-draft-writer-agent": "^0.1.0",
+      "@cinatra-ai/blog-image-prompt-agent": "^0.1.0",
+      "@cinatra-ai/blog-linkedin-writer-agent": "^0.1.0",
+      "@cinatra-ai/reviewer-agent": "^0.1.0"
+    }
+  }
+}
