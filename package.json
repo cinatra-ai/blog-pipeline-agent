@@ -1,6 +1,6 @@
 {
   "name": "@cinatra-ai/blog-pipeline-agent",
-  "version": "0.1.5",
+  "version": "0.1.0",
   "license": "Apache-2.0",
   "description": "Parent orchestrator (WayFlow Flow OAS) composing the 4 blog generation agents (idea, draft, image-prompt, linkedin-writer) as child FlowNodes. Manual brief / reference artifacts input only; transcript input is not accepted. projectId threaded across children. No HITL of its own beyond child reviewer gates.",
   "type": "module",
