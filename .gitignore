@@ -1,0 +1,25 @@
+# Dependencies (no committed lockfile — CI installs fresh)
+node_modules/
+pnpm-lock.yaml
+
+# Build output (tsconfig outDir)
+dist/
+
+# Test coverage
+coverage/
+
+# npm pack output
+*.tgz
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
