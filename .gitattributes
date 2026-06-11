@@ -1,0 +1,10 @@
+# Trim CI/internal noise from `git archive` / GitHub auto source archives
+# (Refs cinatra-ai/cinatra-engineering#56). Directory rules use the /** form:
+# bare `dir/` patterns do not recurse reliably for export-ignore.
+# tsconfig.json is deliberately KEPT in the source archive (reproducibility);
+# the package.json "files" allowlist keeps it out of the npm tarball.
+.github/** export-ignore
+tests/** export-ignore
+.gitattributes export-ignore
+.gitignore export-ignore
+extension-kind-gate.mjs export-ignore
