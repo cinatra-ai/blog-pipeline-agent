@@ -1,0 +1,27 @@
+name: truthful-attribution-gate
+# Thin caller for the org-reusable truthful-attribution-gate (cinatra-ai/ci).
+# WARN mode: findings are annotated, the check is ALWAYS green — it never fails
+# a PR. Pinned to the same engine commit the org runs in ENFORCE today.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  # actions:read is required: the engine resolves a reusable-workflow check-run to
+  # its Actions run to verify the called workflow at the pinned commit. With an
+  # explicit permissions block, any omitted scope defaults to none, and a called
+  # reusable workflow cannot exceed the caller's grant — omitting this causes a
+  # startup failure that WARN mode cannot rescue. Do not drop this line.
+  actions: read
+
+jobs:
+  truthful-attribution-gate:                 # caller job id MUST stay this exact string
+    uses: cinatra-ai/ci/.github/workflows/truthful-attribution-gate.yml@8eede1022e835997d94974e4bd6205daf72131a2 # v0.1.0
+    with:
+      mode: warn
+      ref: 8eede1022e835997d94974e4bd6205daf72131a2
