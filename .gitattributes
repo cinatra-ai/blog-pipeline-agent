@@ -1,5 +1,5 @@
 # Trim CI/internal noise from `git archive` / GitHub auto source archives
-# (Refs cinatra-ai/cinatra-engineering#56). Directory rules use the /** form:
+# Per the org release-artifact standard. Directory rules use the /** form:
 # bare `dir/` patterns do not recurse reliably for export-ignore.
 # tsconfig.json is deliberately KEPT in the source archive (reproducibility);
 # the package.json "files" allowlist keeps it out of the npm tarball.
