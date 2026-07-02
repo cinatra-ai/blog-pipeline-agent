@@ -71,13 +71,6 @@
     "riskLevel": "low",
     "hasApprovalGates": true,
     "toolAccess": [],
-    "ownerOrgId": null,
-    "agentDependencies": {
-      "@cinatra-ai/blog-idea-generator-agent": "^0.1.0",
-      "@cinatra-ai/blog-draft-writer-agent": "^0.1.0",
-      "@cinatra-ai/blog-image-prompt-agent": "^0.1.0",
-      "@cinatra-ai/blog-linkedin-writer-agent": "^0.1.0",
-      "@cinatra-ai/reviewer-agent": "^0.1.0"
-    }
+    "ownerOrgId": null
   }
 }
