@@ -78,7 +78,15 @@
     {
       "title": "draft",
       "type": "object",
-      "default": {}
+      "default": {},
+      "cinatra": {
+        "artifact": {
+          "extension": "@cinatra-ai/blog-post-artifact",
+          "contentFrom": "draftContent",
+          "declaredMime": "text/markdown",
+          "titleFrom": "draftTitle"
+        }
+      }
     },
     {
       "title": "imagePrompts",
@@ -92,6 +100,24 @@
     },
     {
       "title": "linkedinPost",
+      "type": "string",
+      "default": "",
+      "cinatra": {
+        "artifact": {
+          "extension": "@cinatra-ai/blog-post-artifact",
+          "contentFrom": "linkedinPost",
+          "declaredMime": "text/markdown",
+          "titleFrom": "draftTitle"
+        }
+      }
+    },
+    {
+      "title": "draftTitle",
+      "type": "string",
+      "default": ""
+    },
+    {
+      "title": "draftContent",
       "type": "string",
       "default": ""
     }
@@ -594,6 +620,30 @@
         "$component_ref": "end"
       },
       "destination_input": "linkedinPost"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "name": "draft_projection_postTitle__end_draftTitle",
+      "source_node": {
+        "$component_ref": "draft_projection"
+      },
+      "source_output": "postTitle",
+      "destination_node": {
+        "$component_ref": "end"
+      },
+      "destination_input": "draftTitle"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "name": "draft_projection_blogPostContent__end_draftContent",
+      "source_node": {
+        "$component_ref": "draft_projection"
+      },
+      "source_output": "blogPostContent",
+      "destination_node": {
+        "$component_ref": "end"
+      },
+      "destination_input": "draftContent"
     }
   ],
   "$referenced_components": {
@@ -5027,7 +5077,7 @@
       ],
       "metadata": {
         "cinatra": {
-          "riskClass": "read_only",
+          "riskClass": "write",
           "requiresApproval": false,
           "packageName": "@cinatra-ai/blog-pipeline-agent",
           "description": "Deterministic seam: parses idea_selection_gate.selectedIdeaJson (validated against idea_flow.ideas) into a typed BlogIdea object for blog-draft-writer-agent.idea. Mirrors the email-outreach context_setup string-gate\u2192passthrough\u2192typed-output bridge (_shape 'blog_pipeline_selected_idea'; passthrough route per-_shape shaper)."
@@ -5077,7 +5127,7 @@
       ],
       "metadata": {
         "cinatra": {
-          "riskClass": "read_only",
+          "riskClass": "write",
           "requiresApproval": false,
           "packageName": "@cinatra-ai/blog-pipeline-agent",
           "description": "Deterministic seam: projects blog-draft-writer-agent.draft (object {title,excerpt,content}) into the string fields blog-linkedin-writer-agent needs (postTitle/postExcerpt/blogPostContent). _shape 'blog_pipeline_draft_projection' via the passthrough route per-_shape shaper."
@@ -5102,7 +5152,15 @@
         {
           "title": "draft",
           "type": "object",
-          "default": {}
+          "default": {},
+          "cinatra": {
+            "artifact": {
+              "extension": "@cinatra-ai/blog-post-artifact",
+              "contentFrom": "draftContent",
+              "declaredMime": "text/markdown",
+              "titleFrom": "draftTitle"
+            }
+          }
         },
         {
           "title": "imagePrompts",
@@ -5116,6 +5174,24 @@
         },
         {
           "title": "linkedinPost",
+          "type": "string",
+          "default": "",
+          "cinatra": {
+            "artifact": {
+              "extension": "@cinatra-ai/blog-post-artifact",
+              "contentFrom": "linkedinPost",
+              "declaredMime": "text/markdown",
+              "titleFrom": "draftTitle"
+            }
+          }
+        },
+        {
+          "title": "draftTitle",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "draftContent",
           "type": "string",
           "default": ""
         }
