@@ -72,6 +72,11 @@
     "hasApprovalGates": true,
     "toolAccess": [],
     "ownerOrgId": null,
-    "consumes": []
+    "consumes": [],
+    "produces": [
+      {
+        "extension": "@cinatra-ai/blog-post-artifact"
+      }
+    ]
   }
 }
