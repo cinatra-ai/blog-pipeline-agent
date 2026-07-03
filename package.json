@@ -15,8 +15,8 @@
         "packageName": "@cinatra-ai/blog-draft-writer-agent",
         "edgeType": "runtime",
         "versionConstraint": {
-          "kind": "exact",
-          "version": "0.1.0"
+          "kind": "semver-range",
+          "range": "^0.1.0"
         },
         "requirement": "required",
         "kind": "agent"
@@ -25,8 +25,8 @@
         "packageName": "@cinatra-ai/blog-idea-generator-agent",
         "edgeType": "runtime",
         "versionConstraint": {
-          "kind": "exact",
-          "version": "0.1.0"
+          "kind": "semver-range",
+          "range": "^0.1.0"
         },
         "requirement": "required",
         "kind": "agent"
@@ -35,8 +35,8 @@
         "packageName": "@cinatra-ai/blog-image-prompt-agent",
         "edgeType": "runtime",
         "versionConstraint": {
-          "kind": "exact",
-          "version": "0.1.0"
+          "kind": "semver-range",
+          "range": "^0.1.0"
         },
         "requirement": "required",
         "kind": "agent"
@@ -45,8 +45,8 @@
         "packageName": "@cinatra-ai/blog-linkedin-writer-agent",
         "edgeType": "runtime",
         "versionConstraint": {
-          "kind": "exact",
-          "version": "0.1.0"
+          "kind": "semver-range",
+          "range": "^0.1.0"
         },
         "requirement": "required",
         "kind": "agent"
@@ -55,8 +55,8 @@
         "packageName": "@cinatra-ai/reviewer-agent",
         "edgeType": "runtime",
         "versionConstraint": {
-          "kind": "exact",
-          "version": "0.1.0"
+          "kind": "semver-range",
+          "range": "^0.1.0"
         },
         "requirement": "required",
         "kind": "agent"
