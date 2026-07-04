@@ -142,6 +142,9 @@
       "$component_ref": "draft_flow"
     },
     {
+      "$component_ref": "draft_review_gate"
+    },
+    {
       "$component_ref": "draft_projection"
     },
     {
@@ -197,9 +200,19 @@
     },
     {
       "component_type": "ControlFlowEdge",
-      "name": "draft_flow_to_draft_projection",
+      "name": "draft_flow_to_draft_review_gate",
       "from_node": {
         "$component_ref": "draft_flow"
+      },
+      "to_node": {
+        "$component_ref": "draft_review_gate"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "name": "draft_review_gate_to_draft_projection",
+      "from_node": {
+        "$component_ref": "draft_review_gate"
       },
       "to_node": {
         "$component_ref": "draft_projection"
@@ -335,6 +348,18 @@
     },
     {
       "component_type": "DataFlowEdge",
+      "name": "idea_flow_ideas__idea_selection_gate_ideas",
+      "source_node": {
+        "$component_ref": "idea_flow"
+      },
+      "source_output": "ideas",
+      "destination_node": {
+        "$component_ref": "idea_selection_gate"
+      },
+      "destination_input": "ideas"
+    },
+    {
+      "component_type": "DataFlowEdge",
       "name": "start_cinatra_run_id__selected_idea_cinatra_run_id",
       "source_node": {
         "$component_ref": "start"
@@ -438,6 +463,18 @@
       "source_output": "draft",
       "destination_node": {
         "$component_ref": "draft_projection"
+      },
+      "destination_input": "draft"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "name": "draft_flow_draft__draft_review_gate_draft",
+      "source_node": {
+        "$component_ref": "draft_flow"
+      },
+      "source_output": "draft",
+      "destination_node": {
+        "$component_ref": "draft_review_gate"
       },
       "destination_input": "draft"
     },
@@ -5025,6 +5062,17 @@
           ]
         }
       },
+      "inputs": [
+        {
+          "title": "ideas",
+          "type": "array",
+          "json_schema": {
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      ],
       "outputs": [
         {
           "title": "selectedIdeaJson",
@@ -5133,6 +5181,59 @@
           "description": "Deterministic seam: projects blog-draft-writer-agent.draft (object {title,excerpt,content}) into the string fields blog-linkedin-writer-agent needs (postTitle/postExcerpt/blogPostContent). _shape 'blog_pipeline_draft_projection' via the passthrough route per-_shape shaper."
         }
       }
+    },
+    "draft_review_gate": {
+      "component_type": "InputMessageNode",
+      "id": "draft_review_gate",
+      "name": "Review blog draft",
+      "metadata": {
+        "cinatra": {
+          "riskClass": "read_only",
+          "requiresApproval": true,
+          "renderer": "@cinatra-ai/reviewer-agent:output",
+          "a2uiSurfaceId": "blog-pipeline:draft-review",
+          "autoSkipWhenInputsPresent": false,
+          "inputMessageSchema": {
+            "type": "object",
+            "x-renderer": "@cinatra-ai/reviewer-agent:output",
+            "properties": {
+              "reviewApproval": {
+                "type": "string",
+                "title": "Draft review note"
+              }
+            },
+            "required": [
+              "reviewApproval"
+            ]
+          },
+          "description": "Human reviews the generated blog draft before it is projected for downstream channels; emits an approval note (InputMessageNode emits one string output \u2014 wayflow-input-message-node-contract). This is the runtime HITL pause where continuous-learning skill-autosave capture fires.",
+          "renderInputsContext": [
+            {
+              "title": "draft",
+              "type": "object",
+              "json_schema": {
+                "type": "object"
+              },
+              "default": {}
+            }
+          ]
+        }
+      },
+      "inputs": [
+        {
+          "title": "draft",
+          "type": "object",
+          "json_schema": {
+            "type": "object"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "title": "reviewApproval",
+          "type": "string"
+        }
+      ]
     },
     "end": {
       "component_type": "EndNode",
