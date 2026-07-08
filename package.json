@@ -10,6 +10,7 @@
   "cinatra": {
     "apiVersion": "cinatra.ai/v1",
     "kind": "agent",
+    "displayName": "Blog Pipeline Agent",
     "dependencies": [
       {
         "packageName": "@cinatra-ai/blog-draft-writer-agent",
