@@ -16,7 +16,8 @@
   "inputs": [
     {
       "title": "brief",
-      "type": "string"
+      "type": "string",
+      "format": "multiline"
     },
     {
       "title": "audience",
@@ -710,7 +711,8 @@
       "inputs": [
         {
           "title": "brief",
-          "type": "string"
+          "type": "string",
+          "format": "multiline"
         },
         {
           "title": "audience",
