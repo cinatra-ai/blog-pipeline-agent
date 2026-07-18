@@ -134,6 +134,9 @@
       "$component_ref": "idea_flow"
     },
     {
+      "$component_ref": "emit_ideas_payload"
+    },
+    {
       "$component_ref": "idea_selection_gate"
     },
     {
@@ -141,6 +144,9 @@
     },
     {
       "$component_ref": "draft_flow"
+    },
+    {
+      "$component_ref": "emit_draft_payload"
     },
     {
       "$component_ref": "draft_review_gate"
@@ -171,9 +177,19 @@
     },
     {
       "component_type": "ControlFlowEdge",
-      "name": "idea_flow_to_idea_selection_gate",
+      "name": "idea_flow_to_emit_ideas_payload",
       "from_node": {
         "$component_ref": "idea_flow"
+      },
+      "to_node": {
+        "$component_ref": "emit_ideas_payload"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "name": "emit_ideas_payload_to_idea_selection_gate",
+      "from_node": {
+        "$component_ref": "emit_ideas_payload"
       },
       "to_node": {
         "$component_ref": "idea_selection_gate"
@@ -201,9 +217,19 @@
     },
     {
       "component_type": "ControlFlowEdge",
-      "name": "draft_flow_to_draft_review_gate",
+      "name": "draft_flow_to_emit_draft_payload",
       "from_node": {
         "$component_ref": "draft_flow"
+      },
+      "to_node": {
+        "$component_ref": "emit_draft_payload"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "name": "emit_draft_payload_to_draft_review_gate",
+      "from_node": {
+        "$component_ref": "emit_draft_payload"
       },
       "to_node": {
         "$component_ref": "draft_review_gate"
@@ -349,13 +375,13 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "idea_flow_ideas__idea_selection_gate_ideas",
+      "name": "idea_flow_ideas__emit_ideas_payload_ideas",
       "source_node": {
         "$component_ref": "idea_flow"
       },
       "source_output": "ideas",
       "destination_node": {
-        "$component_ref": "idea_selection_gate"
+        "$component_ref": "emit_ideas_payload"
       },
       "destination_input": "ideas"
     },
@@ -469,13 +495,13 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "draft_flow_draft__draft_review_gate_draft",
+      "name": "draft_flow_draft__emit_draft_payload_draft",
       "source_node": {
         "$component_ref": "draft_flow"
       },
       "source_output": "draft",
       "destination_node": {
-        "$component_ref": "draft_review_gate"
+        "$component_ref": "emit_draft_payload"
       },
       "destination_input": "draft"
     },
@@ -5025,6 +5051,23 @@
         }
       }
     },
+    "emit_ideas_payload": {
+      "component_type": "OutputMessageNode",
+      "id": "emit_ideas_payload",
+      "name": "Emit offered ideas as agent message",
+      "inputs": [
+        {
+          "title": "ideas",
+          "type": "array",
+          "json_schema": {
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      ],
+      "message": "{# pyagentspec-input-hint (do not remove): {{ ideas }} #}{\"ideas\":{{ ideas | tojson }}}"
+    },
     "idea_selection_gate": {
       "component_type": "InputMessageNode",
       "id": "idea_selection_gate",
@@ -5035,7 +5078,6 @@
           "requiresApproval": true,
           "renderer": "@cinatra-ai/reviewer-agent:output",
           "a2uiSurfaceId": "blog-pipeline:idea-selection",
-          "autoSkipWhenInputsPresent": false,
           "inputMessageSchema": {
             "type": "object",
             "x-renderer": "@cinatra-ai/reviewer-agent:output",
@@ -5049,32 +5091,9 @@
               "selectedIdeaJson"
             ]
           },
-          "description": "Human selects exactly one BlogIdea from idea_flow.ideas; emits the chosen idea as a JSON string (InputMessageNode emits one string output \u2014 wayflow-input-message-node-contract).",
-          "renderInputsContext": [
-            {
-              "title": "ideas",
-              "type": "array",
-              "json_schema": {
-                "items": {
-                  "type": "object"
-                }
-              },
-              "default": []
-            }
-          ]
+          "description": "Human selects exactly one BlogIdea from idea_flow.ideas; emits the chosen idea as a JSON string (InputMessageNode emits one string output \u2014 wayflow-input-message-node-contract)."
         }
       },
-      "inputs": [
-        {
-          "title": "ideas",
-          "type": "array",
-          "json_schema": {
-            "items": {
-              "type": "object"
-            }
-          }
-        }
-      ],
       "outputs": [
         {
           "title": "selectedIdeaJson",
@@ -5184,6 +5203,21 @@
         }
       }
     },
+    "emit_draft_payload": {
+      "component_type": "OutputMessageNode",
+      "id": "emit_draft_payload",
+      "name": "Emit generated draft as agent message",
+      "inputs": [
+        {
+          "title": "draft",
+          "type": "object",
+          "json_schema": {
+            "type": "object"
+          }
+        }
+      ],
+      "message": "{# pyagentspec-input-hint (do not remove): {{ draft }} #}{\"draft\":{{ draft | tojson }}}"
+    },
     "draft_review_gate": {
       "component_type": "InputMessageNode",
       "id": "draft_review_gate",
@@ -5194,7 +5228,6 @@
           "requiresApproval": true,
           "renderer": "@cinatra-ai/reviewer-agent:output",
           "a2uiSurfaceId": "blog-pipeline:draft-review",
-          "autoSkipWhenInputsPresent": false,
           "inputMessageSchema": {
             "type": "object",
             "x-renderer": "@cinatra-ai/reviewer-agent:output",
@@ -5208,28 +5241,9 @@
               "reviewApproval"
             ]
           },
-          "description": "Human reviews the generated blog draft before it is projected for downstream channels; emits an approval note (InputMessageNode emits one string output \u2014 wayflow-input-message-node-contract). This is the runtime HITL pause where continuous-learning skill-autosave capture fires.",
-          "renderInputsContext": [
-            {
-              "title": "draft",
-              "type": "object",
-              "json_schema": {
-                "type": "object"
-              },
-              "default": {}
-            }
-          ]
+          "description": "Human reviews the generated blog draft before it is projected for downstream channels; emits an approval note (InputMessageNode emits one string output \u2014 wayflow-input-message-node-contract). This is the runtime HITL pause where continuous-learning skill-autosave capture fires."
         }
       },
-      "inputs": [
-        {
-          "title": "draft",
-          "type": "object",
-          "json_schema": {
-            "type": "object"
-          }
-        }
-      ],
       "outputs": [
         {
           "title": "reviewApproval",
