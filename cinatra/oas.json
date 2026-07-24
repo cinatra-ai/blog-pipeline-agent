@@ -9,7 +9,8 @@
       "type": "flow",
       "packageName": "@cinatra-ai/blog-pipeline-agent",
       "hitlScreens": [
-        "@cinatra-ai/reviewer-agent:output"
+        "@cinatra-ai/reviewer-agent:output",
+        "@cinatra-ai/blog-pipeline-agent:idea-selection"
       ]
     }
   },
@@ -5076,11 +5077,11 @@
         "cinatra": {
           "riskClass": "read_only",
           "requiresApproval": true,
-          "renderer": "@cinatra-ai/reviewer-agent:output",
+          "renderer": "@cinatra-ai/blog-pipeline-agent:idea-selection",
           "a2uiSurfaceId": "blog-pipeline:idea-selection",
           "inputMessageSchema": {
             "type": "object",
-            "x-renderer": "@cinatra-ai/reviewer-agent:output",
+            "x-renderer": "@cinatra-ai/blog-pipeline-agent:idea-selection",
             "properties": {
               "selectedIdeaJson": {
                 "type": "string",

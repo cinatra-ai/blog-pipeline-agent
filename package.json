@@ -63,6 +63,14 @@
         "kind": "agent"
       }
     ],
+    "fieldRenderers": [
+      {
+        "id": "@cinatra-ai/blog-pipeline-agent:idea-selection",
+        "kind": "blog-idea-selection",
+        "priority": 80,
+        "midRunHitl": true
+      }
+    ],
     "packageType": "agent",
     "manifestVersion": 1,
     "sourceTemplateId": "blog-pipeline-agent-flow",
