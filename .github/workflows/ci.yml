@@ -148,3 +148,14 @@ jobs:
         # Profile-1.0 BPMN compile / full OAS runtime-invariant validation /
         # trust+signature checks re-run marketplace-side at publish/install.
         run: node extension-kind-gate.mjs --package-root .
+      - name: Self-owned renderer-binding resolve gate (cinatra#2002)
+        # Fail-closed compile→resolve lock (the #1959 template intent): every
+        # self-owned `@cinatra-ai/blog-pipeline-agent:*` renderer/x-renderer ref
+        # in cinatra/oas.json must resolve to a declared cinatra.fieldRenderers
+        # binding (and be listed in a flow's hitlScreens) — a renamed/removed
+        # binding breaks the build rather than silently degrading a HITL gate to
+        # the schema-field floor. Pack-owned, self-contained, zero-dependency;
+        # NOT the vendored extension-kind-gate. SHARED refs (reviewer-agent:output,
+        # context-selection-agent:*) resolve host-side and are deliberately out of
+        # scope — leaving the reviewer teardown cohort (cinatra#1796 S3) untouched.
+        run: node renderer-binding-gate.mjs --package-root .
