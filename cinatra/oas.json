@@ -9,7 +9,6 @@
       "type": "flow",
       "packageName": "@cinatra-ai/blog-pipeline-agent",
       "hitlScreens": [
-        "@cinatra-ai/reviewer-agent:output",
         "@cinatra-ai/blog-pipeline-agent:idea-selection"
       ]
     }
@@ -2061,16 +2060,7 @@
       "metadata": {
         "cinatra": {
           "packageName": "@cinatra-ai/blog-idea-generator-agent",
-          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-idea-generator-agent.",
-          "gateSteps": [
-            {
-              "name": "Blog ideas",
-              "description": "Review the blog ideas output before continuing the pipeline.",
-              "renderer": "@cinatra-ai/reviewer-agent:output",
-              "hitlOwnedBy": "self",
-              "gateCount": 1
-            }
-          ]
+          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-idea-generator-agent."
         }
       }
     },
@@ -3359,16 +3349,7 @@
       "metadata": {
         "cinatra": {
           "packageName": "@cinatra-ai/blog-draft-writer-agent",
-          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-draft-writer-agent.",
-          "gateSteps": [
-            {
-              "name": "Blog draft",
-              "description": "Review the blog draft output before continuing the pipeline.",
-              "renderer": "@cinatra-ai/reviewer-agent:output",
-              "hitlOwnedBy": "self",
-              "gateCount": 1
-            }
-          ]
+          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-draft-writer-agent."
         }
       }
     },
@@ -4641,16 +4622,7 @@
       "metadata": {
         "cinatra": {
           "packageName": "@cinatra-ai/blog-image-prompt-agent",
-          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-image-prompt-agent. The in-pipeline image-BYTES producer is the asset-blog blog_image_generate_* path (job 3 / generateBlogImage\u2026), whose materializer produces @cinatra-ai/blog-image-artifact via createSemanticArtifact + assertSemanticType({assertedBy:'agent'}). blog-image-prompt-agent stays TEXT-only (emits prompts, NO produces).",
-          "gateSteps": [
-            {
-              "name": "Image prompts",
-              "description": "Review the image prompts output before continuing the pipeline.",
-              "renderer": "@cinatra-ai/reviewer-agent:output",
-              "hitlOwnedBy": "self",
-              "gateCount": 1
-            }
-          ]
+          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-image-prompt-agent. The in-pipeline image-BYTES producer is the asset-blog blog_image_generate_* path (job 3 / generateBlogImage\u2026), whose materializer produces @cinatra-ai/blog-image-artifact via createSemanticArtifact + assertSemanticType({assertedBy:'agent'}). blog-image-prompt-agent stays TEXT-only (emits prompts, NO produces)."
         }
       }
     },
@@ -5039,16 +5011,7 @@
       "metadata": {
         "cinatra": {
           "packageName": "@cinatra-ai/blog-linkedin-writer-agent",
-          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-linkedin-writer-agent.",
-          "gateSteps": [
-            {
-              "name": "LinkedIn post",
-              "description": "Review the linkedin post output before continuing the pipeline.",
-              "renderer": "@cinatra-ai/reviewer-agent:output",
-              "hitlOwnedBy": "self",
-              "gateCount": 1
-            }
-          ]
+          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-linkedin-writer-agent."
         }
       }
     },
@@ -5227,11 +5190,9 @@
         "cinatra": {
           "riskClass": "read_only",
           "requiresApproval": true,
-          "renderer": "@cinatra-ai/reviewer-agent:output",
           "a2uiSurfaceId": "blog-pipeline:draft-review",
           "inputMessageSchema": {
             "type": "object",
-            "x-renderer": "@cinatra-ai/reviewer-agent:output",
             "properties": {
               "reviewApproval": {
                 "type": "string",
@@ -5242,7 +5203,7 @@
               "reviewApproval"
             ]
           },
-          "description": "Human reviews the generated blog draft before it is projected for downstream channels; emits an approval note (InputMessageNode emits one string output \u2014 wayflow-input-message-node-contract). This is the runtime HITL pause where continuous-learning skill-autosave capture fires."
+          "description": "MID-RUN HOLD, no reviewer of its own (cinatra#2047 / cinatra#1796). This flow declares the PAUSE; core's artifact-lifecycle interception owns the DECISION. The pipeline stops here, after the draft is generated and before draft_projection \u2192 image_flow \u2192 linkedin_flow derive anything from it, so the human can approve / request changes / reject on the run-embedded review gate core auto-opens for the produced draft artifact, then resume. Deliberately pins NO x-renderer: the decision surface is core's, and this node degrades to the host schema-field floor rather than re-binding a retired agent's renderer. Emits one string note (InputMessageNode emits one string output \u2014 wayflow-input-message-node-contract); the note is advisory only and is consumed by no downstream node. This is the runtime HITL pause where continuous-learning skill-autosave capture fires."
         }
       },
       "outputs": [
