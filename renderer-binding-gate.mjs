@@ -5,23 +5,31 @@
 //
 //     node renderer-binding-gate.mjs --package-root .
 //
-// cinatra#2002 (build-item 3): the two blog-pipeline HITL gates adopt the #1959
-// template — self-namespaced, pack-owned field renderers rather than the shared
-// `@cinatra-ai/reviewer-agent:output`. #1959 established that a renamed/removed
+// cinatra#2002 (build-item 3): the blog-pipeline HITL gates adopt the #1959
+// template — self-namespaced, pack-owned field renderers rather than a shared
+// renderer owned by another pack. #1959 established that a renamed/removed
 // renderer must FAIL THE BUILD (fail-closed) rather than SILENTLY DEGRADE a gate
 // to the schema-field floor at runtime. This gate is the author-facing (blog
 // repo, pre-publish) half of that lock: it asserts that every self-owned
 // renderer reference in `cinatra/oas.json` resolves to a declared
 // `cinatra.fieldRenderers` binding in `package.json`, and vice-versa.
 //
-// SCOPE — SELF-OWNED BINDINGS ONLY. The pack's own namespace is
+// SCOPE — SELF-OWNED BINDINGS ONLY (checks A–E). The pack's own namespace is
 // `<package.name>:` (e.g. `@cinatra-ai/blog-pipeline-agent:`). SHARED refs owned
-// by OTHER extensions — `@cinatra-ai/reviewer-agent:output`,
-// `@cinatra-ai/context-selection-agent:context-selector` — are DELIBERATELY out
-// of scope: they resolve host-side against the registered renderer map at
-// install time, this content-only repo cannot resolve them, and they belong to
-// their declaring packs / the reviewer teardown cohort (cinatra#1796 Stage 3).
-// Leaving them untouched keeps this gate strictly disjoint from that lane.
+// by OTHER extensions — e.g. `@cinatra-ai/context-selection-agent:context-selector`
+// — are DELIBERATELY out of scope: they resolve host-side against the registered
+// renderer map at install time, this content-only repo cannot resolve them, and
+// they belong to their declaring packs.
+//
+// PLUS one cross-cutting ratchet (check F, cinatra#2047 row 8 / cinatra#1796):
+// the three RETIRED lifecycle agents must have ZERO exact-identity references in
+// the two documents this gate already reads — `package.json` and
+// `cinatra/oas.json`. That is the whole surface through which a reviewer/auditor
+// binding can re-enter the RUNTIME (a manifest dependency edge or a gate
+// renderer/x-renderer); prose elsewhere in the repo is out of scope by design.
+// This flow migrated off its embedded reviewer step onto core
+// artifact-lifecycle interception, and F keeps that migration from silently
+// regressing via a copy-pasted gate or a re-added dependency.
 //
 // WHY SELF-CONTAINED — mirrors the discipline of `extension-kind-gate.mjs`: an
 // extracted extension repo's CI runs unauthenticated, BEFORE the @cinatra-ai
@@ -48,6 +56,14 @@
 //                       host would not classify the pause as a HITL screen).
 //   E) shape         — every declared fieldRenderers id is itself self-owned
 //                       (a pack declares only its own bindings) and unique.
+//   F) retirement    — ZERO exact-identity references to the retired lifecycle
+//                       agents (reviewer / auditor / skill-recommender) in the
+//                       two documents this gate reads: package.json and
+//                       cinatra/oas.json. EXACT-identity by
+//                       construction: a string matches only when it EQUALS the
+//                       package name or begins with `<name>:` — so a distinct
+//                       package such as `@cinatra-ai/code-reviewer-agent` can
+//                       never be a false positive.
 // ---------------------------------------------------------------------------
 
 import { readFileSync } from "node:fs";
@@ -127,6 +143,54 @@ export function collectOasBindings(oas) {
     }
   });
   return { refs, gates, hitlScreens };
+}
+
+// The lifecycle agents retired by epic cinatra#2037 / accepted in cinatra#2047
+// (row 8). A pack must carry no reference to any of them: core intercepts the
+// artifact lifecycle itself, so no flow composes a reviewer/auditor of its own.
+export const RETIRED_LIFECYCLE_AGENTS = Object.freeze([
+  "@cinatra-ai/reviewer-agent",
+  "@cinatra-ai/auditor-agent",
+  "@cinatra-ai/skill-recommender-agent",
+]);
+
+/** EXACT-identity match: the string IS the package, or is one of its namespaced
+ * ids (`<name>:<suffix>`). Never a substring match, so a different package that
+ * merely CONTAINS a retired name (e.g. `@cinatra-ai/code-reviewer-agent`) is not
+ * a false positive. */
+export function retiredAgentIdentity(value) {
+  if (typeof value !== "string") return null;
+  for (const name of RETIRED_LIFECYCLE_AGENTS) {
+    if (value === name || value.startsWith(`${name}:`)) return name;
+  }
+  return null;
+}
+
+/** Collect every `{path, value, agent}` string in a JSON document that names a
+ * retired lifecycle agent by exact identity. */
+export function collectRetiredAgentRefs(doc, rootPath) {
+  const found = [];
+  const visit = (node, path) => {
+    if (typeof node === "string") {
+      const agent = retiredAgentIdentity(node);
+      if (agent) found.push({ path, value: node, agent });
+      return;
+    }
+    if (node === null || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      for (let i = 0; i < node.length; i++) visit(node[i], `${path}[${i}]`);
+      return;
+    }
+    for (const key of Object.keys(node)) {
+      // A KEY naming a retired agent counts too (e.g. a dependency map keyed by
+      // package name), otherwise the ratchet would miss it.
+      const agent = retiredAgentIdentity(key);
+      if (agent) found.push({ path: `${path}.${key}`, value: key, agent });
+      visit(node[key], `${path}.${key}`);
+    }
+  };
+  visit(doc, rootPath);
+  return found;
 }
 
 export function evaluate({ pkg, oas }) {
@@ -212,6 +276,17 @@ export function evaluate({ pkg, oas }) {
         errors.push(`self-owned gate binding '${id}' at ${g.path} is not listed in any flow-level metadata.cinatra.hitlScreens — the host would not classify the pause as a HITL screen`);
       }
     }
+  }
+
+  // (F) retirement ratchet: zero exact-identity references to the retired
+  // lifecycle agents. Scans BOTH documents (a reviewer binding can re-enter via
+  // an oas gate renderer OR a manifest dependency edge).
+  const retiredRefs = [
+    ...collectRetiredAgentRefs(pkg, "package.json"),
+    ...(oas ? collectRetiredAgentRefs(oas, "cinatra/oas.json") : []),
+  ];
+  for (const r of retiredRefs) {
+    errors.push(`${r.path} references '${r.value}' — ${r.agent} is RETIRED (epic cinatra#2037, accepted cinatra#2047 row 8). Core intercepts the artifact lifecycle: a flow declares its own PAUSE and lets core open the review gate; it never composes a reviewer/auditor of its own`);
   }
 
   return { errors };

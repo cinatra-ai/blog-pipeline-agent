@@ -3,6 +3,10 @@
 All notable changes to this project are documented here, derived from the
 project's merged pull request and release-tag history.
 
+## Unreleased
+
+- feat: the pipeline no longer composes a reviewer of its own — the draft-review step is now a pure mid-run hold and the approve / request-changes / reject decision is taken on the review step Cinatra opens for the generated draft (core artifact-lifecycle interception). The four metadata-only child review gate steps and the required `@cinatra-ai/reviewer-agent` runtime dependency are removed; `renderer-binding-gate.mjs` gains a fail-closed exact-identity ratchet against the retired lifecycle agents (cinatra#2047 row 8, cinatra#1796)
+
 ## v0.1.2 — 2026-07-07
 
 - fix: the idea-selection gate receives the generated ideas as a declared input and presents them to the reviewer, and the draft-review step is a real pause instead of an auto-skip (#30)
