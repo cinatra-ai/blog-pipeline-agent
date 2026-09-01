@@ -3,7 +3,7 @@
   "component_type": "Flow",
   "id": "blog-pipeline-agent-flow",
   "name": "Blog Pipeline Agent",
-  "description": "Parent orchestrator (WayFlow Flow OAS, D5) composing the 4 blog generation agents as child FlowNodes: blog-idea-generator-agent \u2192 (idea selection) \u2192 blog-draft-writer-agent \u2192 blog-image-prompt-agent + blog-linkedin-writer-agent. Manual brief / reference artifacts input only \u2014 transcript DROPPED. projectId threaded across all child nodes. Two deterministic seam ApiNodes (selected_idea, draft_projection) bridge the idea-array\u2192draft-object and draft-object\u2192linkedin-string shape gaps (email-outreach passthrough precedent). Zero skill-id declarations (owner law).",
+  "description": "Parent orchestrator (WayFlow Flow OAS, D5) composing the 4 blog generation agents as child FlowNodes: blog-idea-generator-agent → (idea selection) → blog-draft-writer-agent → blog-image-prompt-agent + blog-linkedin-writer-agent. Manual brief / reference artifacts input only — transcript DROPPED. projectId threaded across all child nodes. Two deterministic seam ApiNodes (selected_idea, draft_projection) bridge the idea-array→draft-object and draft-object→linkedin-string shape gaps (email-outreach passthrough precedent). Zero skill-id declarations (owner law).",
   "metadata": {
     "cinatra": {
       "type": "flow",
@@ -71,7 +71,7 @@
       "type": "array",
       "json_schema": {
         "items": {
-          "type": "object"
+          "type": "string"
         }
       },
       "default": []
@@ -111,6 +111,10 @@
           "titleFrom": "draftTitle"
         }
       }
+    },
+    {
+      "title": "linkedinTitle",
+      "type": "string"
     },
     {
       "title": "draftTitle",
@@ -687,6 +691,18 @@
     },
     {
       "component_type": "DataFlowEdge",
+      "name": "linkedin_flow_title__end_linkedinTitle",
+      "source_node": {
+        "$component_ref": "linkedin_flow"
+      },
+      "source_output": "title",
+      "destination_node": {
+        "$component_ref": "end"
+      },
+      "destination_input": "linkedinTitle"
+    },
+    {
+      "component_type": "DataFlowEdge",
       "name": "draft_projection_postTitle__end_draftTitle",
       "source_node": {
         "$component_ref": "draft_projection"
@@ -1170,8 +1186,8 @@
           "http_method": "POST",
           "data": {
             "agent_id": "blog-idea-generator-agent",
-            "system": "You are a stateless blog-idea-generator agent. Follow the SKILL.md step-by-step. Return a single JSON object {ideas:[{title, summary, outline:[...]}], notes} \u2014 nothing else; no markdown wrapping; no prose preface.",
-            "user": "Generate count distinct blog post ideas for the brief below. Each idea needs a title (\u226480 chars), a 1-2 sentence summary, and 3-7 outline points covering the post arc. Respect tone if provided. Avoid topics in existingIdeasContext.\nInputs:\n- brief: {{ brief }}\n- audience: {{ audience }}\n- count: {{ count }}\n- tone: {{ tone }}\n- existingIdeasContext: {{ existingIdeasContext }}\n- referenceContent: {{ referenceContent }}\n- contextSlotBindings: {{ contextSlotBindings }}",
+            "system": "You are a stateless blog-idea-generator agent. Follow the SKILL.md step-by-step. Return a single JSON object {ideas:[{title, summary, outline:[...]}], notes} — nothing else; no markdown wrapping; no prose preface.",
+            "user": "Generate count distinct blog post ideas for the brief below. Each idea needs a title (≤80 chars), a 1-2 sentence summary, and 3-7 outline points covering the post arc. Respect tone if provided. Avoid topics in existingIdeasContext.\nInputs:\n- brief: {{ brief }}\n- audience: {{ audience }}\n- count: {{ count }}\n- tone: {{ tone }}\n- existingIdeasContext: {{ existingIdeasContext }}\n- referenceContent: {{ referenceContent }}\n- contextSlotBindings: {{ contextSlotBindings }}",
             "agent_run_id": "{{ agent_run_id }}",
             "cinatra_llm": {
               "preferredProvider": "openai",
@@ -1262,7 +1278,7 @@
               "riskClass": "write_safe",
               "requiresApproval": false,
               "packageName": "@cinatra-ai/blog-idea-generator-agent",
-              "description": "Single ApiNode \u2192 /api/llm-bridge. Bridge auto-discovers SKILL.md from agents/cinatra/blog-idea-generator-agent/skills/blog-idea-generator-agent/SKILL.md (via agent_id). metadata.cinatra.toolboxes is INTENTIONALLY OMITTED so default toolbox injection runs; the SKILL.md instructs the LLM NOT to call any MCP primitive \u2014 ideas are generated purely from inline inputs. No HITL gates; the LLM returns the JSON envelope and the run completes."
+              "description": "Single ApiNode → /api/llm-bridge. Bridge auto-discovers SKILL.md from agents/cinatra/blog-idea-generator-agent/skills/blog-idea-generator-agent/SKILL.md (via agent_id). metadata.cinatra.toolboxes is INTENTIONALLY OMITTED so default toolbox injection runs; the SKILL.md instructs the LLM NOT to call any MCP primitive — ideas are generated purely from inline inputs. No HITL gates; the LLM returns the JSON envelope and the run completes."
             }
           }
         },
@@ -2060,7 +2076,7 @@
       "metadata": {
         "cinatra": {
           "packageName": "@cinatra-ai/blog-idea-generator-agent",
-          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-idea-generator-agent."
+          "description": "Child generation FlowNode → @cinatra-ai/blog-idea-generator-agent."
         }
       }
     },
@@ -2465,7 +2481,7 @@
           "http_method": "POST",
           "data": {
             "agent_id": "blog-draft-writer-agent",
-            "system": "You are a stateless blog draft writer agent. Follow the SKILL.md step-by-step. Do NOT call any MCP tool. Return a single JSON object with {draft: {title, excerpt, content, sourcesUsed?}, notes} \u2014 nothing else, no Markdown wrapping.",
+            "system": "You are a stateless blog draft writer agent. Follow the SKILL.md step-by-step. Do NOT call any MCP tool. Return a single JSON object with {draft: {title, excerpt, content, sourcesUsed?}, notes} — nothing else, no Markdown wrapping.",
             "user": "Write a blog draft from the following inputs.\nInputs:\n- idea: {{ idea }}\n- tone: {{ tone }}\n- length: {{ length }}\n- referenceContent: {{ referenceContent }}\n- audience: {{ audience }}\n- voice: {{ voice }}\n- sources: {{ sources }}\n- contextSlotBindings: {{ contextSlotBindings }}",
             "agent_run_id": "{{ agent_run_id }}",
             "cinatra_llm": {
@@ -2556,7 +2572,7 @@
               "riskClass": "read_only",
               "requiresApproval": false,
               "packageName": "@cinatra-ai/blog-draft-writer-agent",
-              "description": "Single ApiNode \u2192 /api/llm-bridge. Bridge auto-discovers SKILL.md from agents/cinatra/blog-draft-writer-agent/skills/blog-draft-writer-agent/SKILL.md (via agent_id). metadata.cinatra.toolboxes is INTENTIONALLY OMITTED \u2014 codex-locked decision #5: this leaf does not call web_search; caller chains @cinatra-ai/web-research-agent upstream if research is needed. SKILL.md forbids all MCP tool calls \u2014 this is a pure LLM-only generation leaf."
+              "description": "Single ApiNode → /api/llm-bridge. Bridge auto-discovers SKILL.md from agents/cinatra/blog-draft-writer-agent/skills/blog-draft-writer-agent/SKILL.md (via agent_id). metadata.cinatra.toolboxes is INTENTIONALLY OMITTED — codex-locked decision #5: this leaf does not call web_search; caller chains @cinatra-ai/web-research-agent upstream if research is needed. SKILL.md forbids all MCP tool calls — this is a pure LLM-only generation leaf."
             }
           }
         },
@@ -3349,7 +3365,7 @@
       "metadata": {
         "cinatra": {
           "packageName": "@cinatra-ai/blog-draft-writer-agent",
-          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-draft-writer-agent."
+          "description": "Child generation FlowNode → @cinatra-ai/blog-draft-writer-agent."
         }
       }
     },
@@ -3731,8 +3747,8 @@
           "http_method": "POST",
           "data": {
             "agent_id": "blog-image-prompt-agent",
-            "system": "You are a stateless blog image-prompt generator. Follow the SKILL.md step-by-step. Return a single JSON object with {prompts, notes} \u2014 nothing else.",
-            "user": "Generate {{ count }} blog-image prompts for the supplied draft.\n\nDraft (JSON): {{ draft }}\n\nDistribute the prompts across these placements (default: cover, inline, social): {{ placements }}\n\nVisual style guidance (may be empty): {{ style }}\n\nBrand keywords to weave in (may be empty array): {{ brandKeywords }}\n\nReturn ONLY the JSON object specified in SKILL.md \u2014 keys: prompts (array of {placement, prompt, rationale}), notes (string).\n- contextSlotBindings: {{ contextSlotBindings }}",
+            "system": "You are a stateless blog image-prompt generator. Follow the SKILL.md step-by-step. Return a single JSON object with {prompts, notes} — nothing else.",
+            "user": "Generate {{ count }} blog-image prompts for the supplied draft.\n\nDraft (JSON): {{ draft }}\n\nDistribute the prompts across these placements (default: cover, inline, social): {{ placements }}\n\nVisual style guidance (may be empty): {{ style }}\n\nBrand keywords to weave in (may be empty array): {{ brandKeywords }}\n\nReturn ONLY the JSON object specified in SKILL.md — keys: prompts (array of {placement, prompt, rationale}), notes (string).\n- contextSlotBindings: {{ contextSlotBindings }}",
             "agent_run_id": "{{ agent_run_id }}",
             "cinatra_llm": {
               "preferredProvider": "openai",
@@ -3824,7 +3840,7 @@
               "riskClass": "read_only",
               "requiresApproval": false,
               "packageName": "@cinatra-ai/blog-image-prompt-agent",
-              "description": "Single ApiNode \u2192 /api/llm-bridge. Bridge auto-discovers SKILL.md from agents/cinatra/blog-image-prompt-agent/skills/blog-image-prompt-agent/SKILL.md (via agent_id). No toolboxes \u2014 the LLM generates image prompts from the supplied draft using its own world knowledge; no MCP primitive calls, no web_search needed."
+              "description": "Single ApiNode → /api/llm-bridge. Bridge auto-discovers SKILL.md from agents/cinatra/blog-image-prompt-agent/skills/blog-image-prompt-agent/SKILL.md (via agent_id). No toolboxes — the LLM generates image prompts from the supplied draft using its own world knowledge; no MCP primitive calls, no web_search needed."
             }
           }
         },
@@ -4622,7 +4638,7 @@
       "metadata": {
         "cinatra": {
           "packageName": "@cinatra-ai/blog-image-prompt-agent",
-          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-image-prompt-agent. The in-pipeline image-BYTES producer is the asset-blog blog_image_generate_* path (job 3 / generateBlogImage\u2026), whose materializer produces @cinatra-ai/blog-image-artifact via createSemanticArtifact + assertSemanticType({assertedBy:'agent'}). blog-image-prompt-agent stays TEXT-only (emits prompts, NO produces)."
+          "description": "Child generation FlowNode → @cinatra-ai/blog-image-prompt-agent. The in-pipeline image-BYTES producer is the asset-blog blog_image_generate_* path (job 3 / generateBlogImage…), whose materializer produces @cinatra-ai/blog-image-artifact via createSemanticArtifact + assertSemanticType({assertedBy:'agent'}). blog-image-prompt-agent stays TEXT-only (emits prompts, NO produces)."
         }
       }
     },
@@ -4686,6 +4702,10 @@
       "outputs": [
         {
           "title": "post",
+          "type": "string"
+        },
+        {
+          "title": "title",
           "type": "string"
         },
         {
@@ -4921,7 +4941,7 @@
           "http_method": "POST",
           "data": {
             "agent_id": "blog-linkedin-writer-agent",
-            "system": "You are a stateless blog LinkedIn writer agent. Follow the SKILL.md step-by-step. Do NOT call any MCP tool. Return a single JSON object with {post, notes} \u2014 nothing else, no Markdown wrapping.",
+            "system": "You are a stateless blog LinkedIn writer agent. Follow the SKILL.md step-by-step. Do NOT call any MCP tool. Return a single JSON object with {post, notes} — nothing else, no Markdown wrapping.",
             "user": "Write a promotional LinkedIn post from the following inputs.\nInputs:\n- postTitle: {{ postTitle }}\n- blogPostUrl: {{ blogPostUrl }}\n- companyUrl: {{ companyUrl }}\n- postExcerpt: {{ postExcerpt }}\n- blogPostContent: {{ blogPostContent }}\n- destinationType: {{ destinationType }}\n- destinationName: {{ destinationName }}",
             "agent_run_id": "{{ agent_run_id }}",
             "cinatra_llm": {
@@ -4978,7 +4998,7 @@
               "riskClass": "read_only",
               "requiresApproval": false,
               "packageName": "@cinatra-ai/blog-linkedin-writer-agent",
-              "description": "Single ApiNode \u2192 /api/llm-bridge. The bridge auto-discovers SKILL.md from this agent's own skills/blog-linkedin-writer-agent/SKILL.md via agent_id (same convention as blog-draft-writer-agent). metadata.cinatra.toolboxes INTENTIONALLY OMITTED \u2014 pure LLM-only generation leaf, no web_search, no MCP. SKILL.md content was relocated from packages/asset-blog/skills/generate-linkedin-post. NO skill-id declarations anywhere (owner law: no skill-id field)."
+              "description": "Single ApiNode → /api/llm-bridge. The bridge auto-discovers SKILL.md from this agent's own skills/blog-linkedin-writer-agent/SKILL.md via agent_id (same convention as blog-draft-writer-agent). metadata.cinatra.toolboxes INTENTIONALLY OMITTED — pure LLM-only generation leaf, no web_search, no MCP. SKILL.md content was relocated from packages/asset-blog/skills/generate-linkedin-post. NO skill-id declarations anywhere (owner law: no skill-id field)."
             }
           }
         },
@@ -5011,7 +5031,7 @@
       "metadata": {
         "cinatra": {
           "packageName": "@cinatra-ai/blog-linkedin-writer-agent",
-          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-linkedin-writer-agent."
+          "description": "Child generation FlowNode → @cinatra-ai/blog-linkedin-writer-agent."
         }
       }
     },
@@ -5055,7 +5075,7 @@
               "selectedIdeaJson"
             ]
           },
-          "description": "Human selects exactly one BlogIdea from idea_flow.ideas; emits the chosen idea as a JSON string (InputMessageNode emits one string output \u2014 wayflow-input-message-node-contract)."
+          "description": "Human selects exactly one BlogIdea from idea_flow.ideas; emits the chosen idea as a JSON string (InputMessageNode emits one string output — wayflow-input-message-node-contract)."
         }
       },
       "outputs": [
@@ -5113,7 +5133,7 @@
           "riskClass": "write",
           "requiresApproval": false,
           "packageName": "@cinatra-ai/blog-pipeline-agent",
-          "description": "Deterministic seam: parses idea_selection_gate.selectedIdeaJson (validated against idea_flow.ideas) into a typed BlogIdea object for blog-draft-writer-agent.idea. Mirrors the email-outreach context_setup string-gate\u2192passthrough\u2192typed-output bridge (_shape 'blog_pipeline_selected_idea'; passthrough route per-_shape shaper)."
+          "description": "Deterministic seam: parses idea_selection_gate.selectedIdeaJson (validated against idea_flow.ideas) into a typed BlogIdea object for blog-draft-writer-agent.idea. Mirrors the email-outreach context_setup string-gate→passthrough→typed-output bridge (_shape 'blog_pipeline_selected_idea'; passthrough route per-_shape shaper)."
         }
       }
     },
@@ -5203,7 +5223,7 @@
               "reviewApproval"
             ]
           },
-          "description": "MID-RUN HOLD, no reviewer of its own (cinatra#2047 / cinatra#1796). This flow declares the PAUSE; core's artifact-lifecycle interception owns the DECISION. The pipeline stops here, after the draft is generated and before draft_projection \u2192 image_flow \u2192 linkedin_flow derive anything from it, so the human can approve / request changes / reject on the run-embedded review gate core auto-opens for the produced draft artifact, then resume. Deliberately pins NO x-renderer: the decision surface is core's, and this node degrades to the host schema-field floor rather than re-binding a retired agent's renderer. Emits one string note (InputMessageNode emits one string output \u2014 wayflow-input-message-node-contract); the note is advisory only and is consumed by no downstream node. This is the runtime HITL pause where continuous-learning skill-autosave capture fires."
+          "description": "MID-RUN HOLD, no reviewer of its own (cinatra#2047 / cinatra#1796). This flow declares the PAUSE; core's artifact-lifecycle interception owns the DECISION. The pipeline stops here, after the draft is generated and before draft_projection → image_flow → linkedin_flow derive anything from it, so the human can approve / request changes / reject on the run-embedded review gate core auto-opens for the produced draft artifact, then resume. Deliberately pins NO x-renderer: the decision surface is core's, and this node degrades to the host schema-field floor rather than re-binding a retired agent's renderer. Emits one string note (InputMessageNode emits one string output — wayflow-input-message-node-contract); the note is advisory only and is consumed by no downstream node. This is the runtime HITL pause where continuous-learning skill-autosave capture fires."
         }
       },
       "outputs": [
@@ -5223,7 +5243,7 @@
           "type": "array",
           "json_schema": {
             "items": {
-              "type": "object"
+              "type": "string"
             }
           },
           "default": []
@@ -5235,6 +5255,7 @@
           "cinatra": {
             "artifact": {
               "extension": "@cinatra-ai/blog-post-artifact",
+              "objectTypeId": "@cinatra-ai/blog-post-artifact:post",
               "contentFrom": "draftContent",
               "declaredMime": "text/markdown",
               "titleFrom": "draftTitle"
@@ -5257,12 +5278,18 @@
           "default": "",
           "cinatra": {
             "artifact": {
-              "extension": "@cinatra-ai/blog-post-artifact",
+              "extension": "@cinatra-ai/linkedin-artifacts",
+              "objectTypeId": "@cinatra-ai/linkedin:post-draft",
               "contentFrom": "linkedinPost",
-              "declaredMime": "text/markdown",
-              "titleFrom": "draftTitle"
+              "declaredMime": "text/plain",
+              "titleFrom": "linkedinTitle"
             }
           }
+        },
+        {
+          "title": "linkedinTitle",
+          "type": "string",
+          "default": ""
         },
         {
           "title": "draftTitle",
