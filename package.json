@@ -1,6 +1,6 @@
 {
   "name": "@cinatra-ai/blog-pipeline-agent",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "license": "Apache-2.0",
   "description": "Parent orchestrator (WayFlow Flow OAS) composing the 4 blog generation agents (idea, draft, image-prompt, linkedin-writer) as child FlowNodes. Manual brief / reference artifacts input only; transcript input is not accepted. projectId threaded across children. Two HITL pauses of its own: the idea-selection gate and the draft-review hold; the draft review DECISION is core's (artifact-lifecycle interception), this flow only owns the pause.",
   "type": "module",
@@ -61,6 +61,36 @@
         },
         "requirement": "required",
         "kind": "artifact"
+      },
+      {
+        "packageName": "@cinatra-ai/blog-idea-artifact",
+        "edgeType": "runtime",
+        "versionConstraint": {
+          "kind": "semver-range",
+          "range": "^0.1.0"
+        },
+        "requirement": "required",
+        "kind": "artifact"
+      },
+      {
+        "packageName": "@cinatra-ai/blog-image-artifact",
+        "edgeType": "runtime",
+        "versionConstraint": {
+          "kind": "semver-range",
+          "range": "^0.1.0"
+        },
+        "requirement": "required",
+        "kind": "artifact"
+      },
+      {
+        "packageName": "@cinatra-ai/linkedin-artifacts",
+        "edgeType": "runtime",
+        "versionConstraint": {
+          "kind": "semver-range",
+          "range": "^0.1.0"
+        },
+        "requirement": "required",
+        "kind": "artifact"
       }
     ],
     "fieldRenderers": [
@@ -84,8 +114,24 @@
     "consumes": [],
     "produces": [
       {
-        "extension": "@cinatra-ai/blog-post-artifact"
+        "extension": "@cinatra-ai/blog-idea-artifact",
+        "objectTypeId": "@cinatra-ai/blog-idea-artifact:blog-idea"
+      },
+      {
+        "extension": "@cinatra-ai/blog-post-artifact",
+        "objectTypeId": "@cinatra-ai/blog-post-artifact:post"
+      },
+      {
+        "extension": "@cinatra-ai/blog-image-artifact",
+        "objectTypeId": "@cinatra-ai/blog-image-artifact:blog-image"
+      },
+      {
+        "extension": "@cinatra-ai/linkedin-artifacts",
+        "objectTypeId": "@cinatra-ai/linkedin:post-draft"
       }
     ]
+  },
+  "scripts": {
+    "test": "sh -c \"node --test\""
   }
 }

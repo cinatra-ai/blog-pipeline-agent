@@ -71,7 +71,7 @@
       "type": "array",
       "json_schema": {
         "items": {
-          "type": "object"
+          "type": "string"
         }
       },
       "default": []
@@ -111,6 +111,10 @@
           "titleFrom": "draftTitle"
         }
       }
+    },
+    {
+      "title": "linkedinTitle",
+      "type": "string"
     },
     {
       "title": "draftTitle",
@@ -684,6 +688,18 @@
         "$component_ref": "end"
       },
       "destination_input": "linkedinPost"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "name": "linkedin_flow_title__end_linkedinTitle",
+      "source_node": {
+        "$component_ref": "linkedin_flow"
+      },
+      "source_output": "title",
+      "destination_node": {
+        "$component_ref": "end"
+      },
+      "destination_input": "linkedinTitle"
     },
     {
       "component_type": "DataFlowEdge",
@@ -4689,6 +4705,10 @@
           "type": "string"
         },
         {
+          "title": "title",
+          "type": "string"
+        },
+        {
           "title": "notes",
           "type": "string"
         }
@@ -5223,7 +5243,7 @@
           "type": "array",
           "json_schema": {
             "items": {
-              "type": "object"
+              "type": "string"
             }
           },
           "default": []
@@ -5235,6 +5255,7 @@
           "cinatra": {
             "artifact": {
               "extension": "@cinatra-ai/blog-post-artifact",
+              "objectTypeId": "@cinatra-ai/blog-post-artifact:post",
               "contentFrom": "draftContent",
               "declaredMime": "text/markdown",
               "titleFrom": "draftTitle"
@@ -5257,12 +5278,18 @@
           "default": "",
           "cinatra": {
             "artifact": {
-              "extension": "@cinatra-ai/blog-post-artifact",
+              "extension": "@cinatra-ai/linkedin-artifacts",
+              "objectTypeId": "@cinatra-ai/linkedin:post-draft",
               "contentFrom": "linkedinPost",
-              "declaredMime": "text/markdown",
-              "titleFrom": "draftTitle"
+              "declaredMime": "text/plain",
+              "titleFrom": "linkedinTitle"
             }
           }
+        },
+        {
+          "title": "linkedinTitle",
+          "type": "string",
+          "default": ""
         },
         {
           "title": "draftTitle",
