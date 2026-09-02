@@ -47,25 +47,12 @@ test("the ideas the pipeline carries declare their member level as plain strings
   assert.deepEqual(out("ideas").json_schema.items, { type: "string" });
 });
 
-test("the four produces entries are typed", () => {
-  assert.deepEqual(manifest.cinatra.produces, [
-    {
-      extension: "@cinatra-ai/blog-idea-artifact",
-      objectTypeId: "@cinatra-ai/blog-idea-artifact:blog-idea",
-    },
-    {
-      extension: "@cinatra-ai/blog-post-artifact",
-      objectTypeId: "@cinatra-ai/blog-post-artifact:post",
-    },
-    {
-      extension: "@cinatra-ai/blog-image-artifact",
-      objectTypeId: "@cinatra-ai/blog-image-artifact:blog-image",
-    },
-    {
-      extension: "@cinatra-ai/linkedin-artifacts",
-      objectTypeId: "@cinatra-ai/linkedin:post-draft",
-    },
-  ]);
+// The produces entries this run keeps today live in produces-it-can-keep.test.mjs:
+// the ideas and the pictures return with their mid-run write roads.
+test("every produces entry is typed", () => {
+  for (const entry of manifest.cinatra.produces) {
+    assert.match(entry.objectTypeId, /^@[\w-]+\/[\w-]+:[\w-]+$/);
+  }
 });
 
 test("the four artifact dependency edges are declared", () => {
