@@ -4848,6 +4848,18 @@
         },
         {
           "component_type": "DataFlowEdge",
+          "name": "write_title_to_end_title",
+          "source_node": {
+            "$component_ref": "blog-linkedin-writer-agent__write"
+          },
+          "source_output": "title",
+          "destination_node": {
+            "$component_ref": "blog-linkedin-writer-agent__end"
+          },
+          "destination_input": "title"
+        },
+        {
+          "component_type": "DataFlowEdge",
           "name": "write_notes_to_end_notes",
           "source_node": {
             "$component_ref": "blog-linkedin-writer-agent__write"
@@ -4941,7 +4953,7 @@
           "http_method": "POST",
           "data": {
             "agent_id": "blog-linkedin-writer-agent",
-            "system": "You are a stateless blog LinkedIn writer agent. Follow the SKILL.md step-by-step. Do NOT call any MCP tool. Return a single JSON object with {post, notes} \u2014 nothing else, no Markdown wrapping.",
+            "system": "You are a stateless blog LinkedIn writer agent. Follow the SKILL.md step-by-step. Do NOT call any MCP tool. Return a single JSON object with {post, title, notes} \u2014 `title` is a short name for this post draft, at most 80 characters, derived from the blog post's own title, never blank and never a copy of the post \u2014 nothing else, no Markdown wrapping.",
             "user": "Write a promotional LinkedIn post from the following inputs.\nInputs:\n- postTitle: {{ postTitle }}\n- blogPostUrl: {{ blogPostUrl }}\n- companyUrl: {{ companyUrl }}\n- postExcerpt: {{ postExcerpt }}\n- blogPostContent: {{ blogPostContent }}\n- destinationType: {{ destinationType }}\n- destinationName: {{ destinationName }}",
             "agent_run_id": "{{ agent_run_id }}",
             "cinatra_llm": {
@@ -4989,6 +5001,10 @@
               "type": "string"
             },
             {
+              "title": "title",
+              "type": "string"
+            },
+            {
               "title": "notes",
               "type": "string"
             }
@@ -5009,6 +5025,11 @@
           "outputs": [
             {
               "title": "post",
+              "type": "string",
+              "default": ""
+            },
+            {
+              "title": "title",
               "type": "string",
               "default": ""
             },
