@@ -114,16 +114,8 @@
     "consumes": [],
     "produces": [
       {
-        "extension": "@cinatra-ai/blog-idea-artifact",
-        "objectTypeId": "@cinatra-ai/blog-idea-artifact:blog-idea"
-      },
-      {
         "extension": "@cinatra-ai/blog-post-artifact",
         "objectTypeId": "@cinatra-ai/blog-post-artifact:post"
-      },
-      {
-        "extension": "@cinatra-ai/blog-image-artifact",
-        "objectTypeId": "@cinatra-ai/blog-image-artifact:blog-image"
       },
       {
         "extension": "@cinatra-ai/linkedin-artifacts",

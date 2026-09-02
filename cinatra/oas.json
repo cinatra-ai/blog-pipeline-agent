@@ -10,6 +10,16 @@
       "packageName": "@cinatra-ai/blog-pipeline-agent",
       "hitlScreens": [
         "@cinatra-ai/blog-pipeline-agent:idea-selection"
+      ],
+      "produces": [
+        {
+          "extension": "@cinatra-ai/blog-post-artifact",
+          "objectTypeId": "@cinatra-ai/blog-post-artifact:post"
+        },
+        {
+          "extension": "@cinatra-ai/linkedin-artifacts",
+          "objectTypeId": "@cinatra-ai/linkedin:post-draft"
+        }
       ]
     }
   },
