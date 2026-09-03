@@ -31,12 +31,24 @@ test("it declares exactly the two productions it materializes today", () => {
   assert.deepEqual(oas.metadata.cinatra.produces, KEPT);
 });
 
-test("every declared production has a terminal binding to keep it", () => {
+// A production is kept one of two ways: a terminal binding at the end node, or a
+// write the run makes while it is still going. The LinkedIn post is bound at the
+// end; the blog post is written mid-run, before the review that reads it.
+test("every declared production has a road that keeps it", () => {
   const bound = oas.$referenced_components.end.outputs
     .filter((o) => o.cinatra && o.cinatra.artifact)
-    .map((o) => o.cinatra.artifact.extension)
-    .sort();
-  assert.deepEqual(bound, KEPT.map((p) => p.extension).sort());
+    .map((o) => o.cinatra.artifact.extension);
+  const written = Object.values(oas.$referenced_components)
+    .filter(
+      (n) => n && n.component_type === "ApiNode" && n.data && n.data.tool === "artifact_materialize",
+    )
+    .map((n) => n.data.input.extension);
+  assert.deepEqual(bound, ["@cinatra-ai/linkedin-artifacts"]);
+  assert.deepEqual(written, ["@cinatra-ai/blog-post-artifact"]);
+  assert.deepEqual(
+    [...bound, ...written].sort(),
+    KEPT.map((p) => p.extension).sort(),
+  );
 });
 
 test("the four dependency edges stay — they say what the run touches", () => {

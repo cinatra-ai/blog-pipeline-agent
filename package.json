@@ -2,7 +2,7 @@
   "name": "@cinatra-ai/blog-pipeline-agent",
   "version": "0.2.0",
   "license": "Apache-2.0",
-  "description": "Parent orchestrator (WayFlow Flow OAS) composing the 4 blog generation agents (idea, draft, image-prompt, linkedin-writer) as child FlowNodes. Manual brief / reference artifacts input only; transcript input is not accepted. projectId threaded across children. Two HITL pauses of its own: the idea-selection gate and the draft-review hold; the draft review DECISION is core's (artifact-lifecycle interception), this flow only owns the pause.",
+  "description": "Parent orchestrator (WayFlow Flow OAS) that turns one stored blog idea into a reviewed blog post, its featured image and the LinkedIn post that announces it. Manual brief / reference artifacts input only; transcript input is not accepted. projectId threaded across children. Three HITL pauses of its own: the stored-ideas gate, the review the run parks at, and the LinkedIn post; the review DECISION is core's (artifact-lifecycle interception), this flow declares the pause and names the run's own revisions as its targets.",
   "type": "module",
   "files": [
     "cinatra"
@@ -33,7 +33,7 @@
         "kind": "agent"
       },
       {
-        "packageName": "@cinatra-ai/blog-image-prompt-agent",
+        "packageName": "@cinatra-ai/blog-image-generator-agent",
         "edgeType": "runtime",
         "versionConstraint": {
           "kind": "semver-range",
@@ -120,6 +120,69 @@
       {
         "extension": "@cinatra-ai/linkedin-artifacts",
         "objectTypeId": "@cinatra-ai/linkedin:post-draft"
+      }
+    ],
+    "declaredTables": [
+      {
+        "name": "idea_drafts",
+        "organizationColumn": "org_id",
+        "columns": [
+          {
+            "name": "org_id",
+            "type": "text",
+            "notNull": true
+          },
+          {
+            "name": "run_id",
+            "type": "text",
+            "notNull": true
+          },
+          {
+            "name": "idea_artifact_id",
+            "type": "text",
+            "notNull": true
+          },
+          {
+            "name": "idea_revision_id",
+            "type": "text",
+            "notNull": true
+          },
+          {
+            "name": "state",
+            "type": "text",
+            "notNull": true
+          },
+          {
+            "name": "draft_artifact_id",
+            "type": "text"
+          },
+          {
+            "name": "expires_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "created_at",
+            "type": "timestamptz"
+          }
+        ],
+        "indexes": [
+          {
+            "name": "idea_drafts_one_live",
+            "columns": [
+              "org_id",
+              "idea_artifact_id",
+              "state"
+            ],
+            "unique": true
+          },
+          {
+            "name": "idea_drafts_by_run",
+            "columns": [
+              "org_id",
+              "run_id"
+            ]
+          }
+        ]
       }
     ]
   },
