@@ -3,7 +3,7 @@
   "component_type": "Flow",
   "id": "blog-pipeline-agent-flow",
   "name": "Blog Pipeline Agent",
-  "description": "Parent orchestrator (WayFlow Flow OAS, D5) composing the 4 blog generation agents as child FlowNodes: blog-idea-generator-agent \u2192 (idea selection) \u2192 blog-draft-writer-agent \u2192 blog-image-prompt-agent + blog-linkedin-writer-agent. Manual brief / reference artifacts input only \u2014 transcript DROPPED. projectId threaded across all child nodes. Two deterministic seam ApiNodes (selected_idea, draft_projection) bridge the idea-array\u2192draft-object and draft-object\u2192linkedin-string shape gaps (email-outreach passthrough precedent). Zero skill-id declarations (owner law).",
+  "description": "Parent orchestrator (WayFlow Flow OAS) that turns one stored blog idea into a reviewed blog post, its featured image and the LinkedIn post that announces it. Manual brief and reference material only; transcript input is not accepted. Three pauses of its own: the stored-ideas gate, the review the run parks at, and the LinkedIn post.",
   "metadata": {
     "cinatra": {
       "type": "flow",
@@ -50,6 +50,11 @@
       "default": ""
     },
     {
+      "title": "ideaCount",
+      "type": "integer",
+      "default": 5
+    },
+    {
       "title": "companyUrl",
       "type": "string",
       "default": ""
@@ -58,11 +63,6 @@
       "title": "blogPostUrl",
       "type": "string",
       "default": ""
-    },
-    {
-      "title": "imageCount",
-      "type": "integer",
-      "default": 1
     },
     {
       "title": "projectId",
@@ -77,62 +77,21 @@
   ],
   "outputs": [
     {
-      "title": "ideas",
-      "type": "array",
-      "json_schema": {
-        "items": {
-          "type": "string"
-        }
-      },
-      "default": []
-    },
-    {
-      "title": "draft",
-      "type": "object",
-      "default": {},
-      "cinatra": {
-        "artifact": {
-          "extension": "@cinatra-ai/blog-post-artifact",
-          "contentFrom": "draftContent",
-          "declaredMime": "text/markdown",
-          "titleFrom": "draftTitle"
-        }
-      }
-    },
-    {
-      "title": "imagePrompts",
-      "type": "array",
-      "json_schema": {
-        "items": {
-          "type": "object"
-        }
-      },
-      "default": []
-    },
-    {
       "title": "linkedinPost",
       "type": "string",
-      "default": "",
       "cinatra": {
         "artifact": {
-          "extension": "@cinatra-ai/blog-post-artifact",
+          "extension": "@cinatra-ai/linkedin-artifacts",
+          "objectTypeId": "@cinatra-ai/linkedin:post-draft",
           "contentFrom": "linkedinPost",
-          "declaredMime": "text/markdown",
-          "titleFrom": "draftTitle"
+          "declaredMime": "text/plain",
+          "titleFrom": "linkedinTitle"
         }
-      }
-    },
-    {
-      "title": "linkedinTitle",
-      "type": "string"
-    },
-    {
-      "title": "draftTitle",
-      "type": "string",
+      },
       "default": ""
     },
     {
-      "title": "draftContent",
+      "title": "linkedinTitle",
       "type": "string",
       "default": ""
     }
@@ -145,7 +104,7 @@
       "$component_ref": "start"
     },
     {
-      "$component_ref": "idea_flow"
+      "$component_ref": "prepare_ideas"
     },
     {
       "$component_ref": "emit_ideas_payload"
@@ -154,10 +113,19 @@
       "$component_ref": "idea_selection_gate"
     },
     {
-      "$component_ref": "selected_idea"
+      "$component_ref": "reserve_idea"
     },
     {
       "$component_ref": "draft_flow"
+    },
+    {
+      "$component_ref": "write_draft"
+    },
+    {
+      "$component_ref": "image_flow"
+    },
+    {
+      "$component_ref": "complete_relation"
     },
     {
       "$component_ref": "emit_draft_payload"
@@ -166,13 +134,10 @@
       "$component_ref": "draft_review_gate"
     },
     {
-      "$component_ref": "draft_projection"
-    },
-    {
-      "$component_ref": "image_flow"
-    },
-    {
       "$component_ref": "linkedin_flow"
+    },
+    {
+      "$component_ref": "linkedin_review_gate"
     },
     {
       "$component_ref": "end"
@@ -181,110 +146,182 @@
   "control_flow_connections": [
     {
       "component_type": "ControlFlowEdge",
-      "name": "start_to_idea_flow",
+      "id": "start->prepare_ideas",
+      "name": "start->prepare_ideas",
+      "description": "",
+      "metadata": {},
       "from_node": {
         "$component_ref": "start"
       },
+      "from_branch": null,
       "to_node": {
-        "$component_ref": "idea_flow"
+        "$component_ref": "prepare_ideas"
       }
     },
     {
       "component_type": "ControlFlowEdge",
-      "name": "idea_flow_to_emit_ideas_payload",
+      "id": "prepare_ideas->emit_ideas_payload",
+      "name": "prepare_ideas->emit_ideas_payload",
+      "description": "",
+      "metadata": {},
       "from_node": {
-        "$component_ref": "idea_flow"
+        "$component_ref": "prepare_ideas"
       },
+      "from_branch": null,
       "to_node": {
         "$component_ref": "emit_ideas_payload"
       }
     },
     {
       "component_type": "ControlFlowEdge",
-      "name": "emit_ideas_payload_to_idea_selection_gate",
+      "id": "emit_ideas_payload->idea_selection_gate",
+      "name": "emit_ideas_payload->idea_selection_gate",
+      "description": "",
+      "metadata": {},
       "from_node": {
         "$component_ref": "emit_ideas_payload"
       },
+      "from_branch": null,
       "to_node": {
         "$component_ref": "idea_selection_gate"
       }
     },
     {
       "component_type": "ControlFlowEdge",
-      "name": "idea_selection_gate_to_selected_idea",
+      "id": "idea_selection_gate->reserve_idea",
+      "name": "idea_selection_gate->reserve_idea",
+      "description": "",
+      "metadata": {},
       "from_node": {
         "$component_ref": "idea_selection_gate"
       },
+      "from_branch": null,
       "to_node": {
-        "$component_ref": "selected_idea"
+        "$component_ref": "reserve_idea"
       }
     },
     {
       "component_type": "ControlFlowEdge",
-      "name": "selected_idea_to_draft_flow",
+      "id": "reserve_idea->draft_flow",
+      "name": "reserve_idea->draft_flow",
+      "description": "",
+      "metadata": {},
       "from_node": {
-        "$component_ref": "selected_idea"
+        "$component_ref": "reserve_idea"
       },
+      "from_branch": null,
       "to_node": {
         "$component_ref": "draft_flow"
       }
     },
     {
       "component_type": "ControlFlowEdge",
-      "name": "draft_flow_to_emit_draft_payload",
+      "id": "draft_flow->write_draft",
+      "name": "draft_flow->write_draft",
+      "description": "",
+      "metadata": {},
       "from_node": {
         "$component_ref": "draft_flow"
       },
+      "from_branch": null,
       "to_node": {
-        "$component_ref": "emit_draft_payload"
+        "$component_ref": "write_draft"
       }
     },
     {
       "component_type": "ControlFlowEdge",
-      "name": "emit_draft_payload_to_draft_review_gate",
+      "id": "write_draft->image_flow",
+      "name": "write_draft->image_flow",
+      "description": "",
+      "metadata": {},
       "from_node": {
-        "$component_ref": "emit_draft_payload"
+        "$component_ref": "write_draft"
       },
-      "to_node": {
-        "$component_ref": "draft_review_gate"
-      }
-    },
-    {
-      "component_type": "ControlFlowEdge",
-      "name": "draft_review_gate_to_draft_projection",
-      "from_node": {
-        "$component_ref": "draft_review_gate"
-      },
-      "to_node": {
-        "$component_ref": "draft_projection"
-      }
-    },
-    {
-      "component_type": "ControlFlowEdge",
-      "name": "draft_projection_to_image_flow",
-      "from_node": {
-        "$component_ref": "draft_projection"
-      },
+      "from_branch": null,
       "to_node": {
         "$component_ref": "image_flow"
       }
     },
     {
       "component_type": "ControlFlowEdge",
-      "name": "image_flow_to_linkedin_flow",
+      "id": "image_flow->complete_relation",
+      "name": "image_flow->complete_relation",
+      "description": "",
+      "metadata": {},
       "from_node": {
         "$component_ref": "image_flow"
       },
+      "from_branch": null,
+      "to_node": {
+        "$component_ref": "complete_relation"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "complete_relation->emit_draft_payload",
+      "name": "complete_relation->emit_draft_payload",
+      "description": "",
+      "metadata": {},
+      "from_node": {
+        "$component_ref": "complete_relation"
+      },
+      "from_branch": null,
+      "to_node": {
+        "$component_ref": "emit_draft_payload"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "emit_draft_payload->draft_review_gate",
+      "name": "emit_draft_payload->draft_review_gate",
+      "description": "",
+      "metadata": {},
+      "from_node": {
+        "$component_ref": "emit_draft_payload"
+      },
+      "from_branch": null,
+      "to_node": {
+        "$component_ref": "draft_review_gate"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "draft_review_gate->linkedin_flow",
+      "name": "draft_review_gate->linkedin_flow",
+      "description": "",
+      "metadata": {},
+      "from_node": {
+        "$component_ref": "draft_review_gate"
+      },
+      "from_branch": null,
       "to_node": {
         "$component_ref": "linkedin_flow"
       }
     },
     {
       "component_type": "ControlFlowEdge",
-      "name": "linkedin_flow_to_end",
+      "id": "linkedin_flow->linkedin_review_gate",
+      "name": "linkedin_flow->linkedin_review_gate",
+      "description": "",
+      "metadata": {},
       "from_node": {
         "$component_ref": "linkedin_flow"
       },
+      "from_branch": null,
+      "to_node": {
+        "$component_ref": "linkedin_review_gate"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "linkedin_review_gate->end",
+      "name": "linkedin_review_gate->end",
+      "description": "",
+      "metadata": {},
+      "from_node": {
+        "$component_ref": "linkedin_review_gate"
+      },
+      "from_branch": null,
       "to_node": {
         "$component_ref": "end"
       }
@@ -293,105 +330,27 @@
   "data_flow_connections": [
     {
       "component_type": "DataFlowEdge",
-      "name": "start_brief__idea_flow_brief",
-      "source_node": {
-        "$component_ref": "start"
-      },
-      "source_output": "brief",
-      "destination_node": {
-        "$component_ref": "idea_flow"
-      },
-      "destination_input": "brief"
-    },
-    {
-      "component_type": "DataFlowEdge",
-      "name": "start_audience__idea_flow_audience",
-      "source_node": {
-        "$component_ref": "start"
-      },
-      "source_output": "audience",
-      "destination_node": {
-        "$component_ref": "idea_flow"
-      },
-      "destination_input": "audience"
-    },
-    {
-      "component_type": "DataFlowEdge",
-      "name": "start_tone__idea_flow_tone",
-      "source_node": {
-        "$component_ref": "start"
-      },
-      "source_output": "tone",
-      "destination_node": {
-        "$component_ref": "idea_flow"
-      },
-      "destination_input": "tone"
-    },
-    {
-      "component_type": "DataFlowEdge",
-      "name": "start_referenceContent__idea_flow_referenceContent",
-      "source_node": {
-        "$component_ref": "start"
-      },
-      "source_output": "referenceContent",
-      "destination_node": {
-        "$component_ref": "idea_flow"
-      },
-      "destination_input": "referenceContent"
-    },
-    {
-      "component_type": "DataFlowEdge",
-      "name": "start_projectId__idea_flow_projectId",
-      "source_node": {
-        "$component_ref": "start"
-      },
-      "source_output": "projectId",
-      "destination_node": {
-        "$component_ref": "idea_flow"
-      },
-      "destination_input": "projectId"
-    },
-    {
-      "component_type": "DataFlowEdge",
-      "name": "start_cinatra_run_id__idea_flow_cinatra_run_id",
+      "id": "cinatra_run_id:start->prepare_ideas.cinatra_run_id",
+      "name": "cinatra_run_id:start->prepare_ideas",
+      "description": "",
+      "metadata": {},
       "source_node": {
         "$component_ref": "start"
       },
       "source_output": "cinatra_run_id",
       "destination_node": {
-        "$component_ref": "idea_flow"
+        "$component_ref": "prepare_ideas"
       },
       "destination_input": "cinatra_run_id"
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "idea_selection_gate_selectedIdeaJson__selected_idea_selectedIdeaJson",
+      "id": "ideas:prepare_ideas->emit_ideas_payload.ideas",
+      "name": "ideas:prepare_ideas->emit_ideas_payload",
+      "description": "",
+      "metadata": {},
       "source_node": {
-        "$component_ref": "idea_selection_gate"
-      },
-      "source_output": "selectedIdeaJson",
-      "destination_node": {
-        "$component_ref": "selected_idea"
-      },
-      "destination_input": "selectedIdeaJson"
-    },
-    {
-      "component_type": "DataFlowEdge",
-      "name": "idea_flow_ideas__selected_idea_ideas",
-      "source_node": {
-        "$component_ref": "idea_flow"
-      },
-      "source_output": "ideas",
-      "destination_node": {
-        "$component_ref": "selected_idea"
-      },
-      "destination_input": "ideas"
-    },
-    {
-      "component_type": "DataFlowEdge",
-      "name": "idea_flow_ideas__emit_ideas_payload_ideas",
-      "source_node": {
-        "$component_ref": "idea_flow"
+        "$component_ref": "prepare_ideas"
       },
       "source_output": "ideas",
       "destination_node": {
@@ -401,21 +360,117 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "start_cinatra_run_id__selected_idea_cinatra_run_id",
+      "id": "ideas:prepare_ideas->idea_selection_gate.ideas",
+      "name": "ideas:prepare_ideas->idea_selection_gate",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "prepare_ideas"
+      },
+      "source_output": "ideas",
+      "destination_node": {
+        "$component_ref": "idea_selection_gate"
+      },
+      "destination_input": "ideas"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "reason:prepare_ideas->idea_selection_gate.reason",
+      "name": "reason:prepare_ideas->idea_selection_gate",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "prepare_ideas"
+      },
+      "source_output": "reason",
+      "destination_node": {
+        "$component_ref": "idea_selection_gate"
+      },
+      "destination_input": "reason"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "brief:start->idea_selection_gate.brief",
+      "name": "brief:start->idea_selection_gate",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "brief",
+      "destination_node": {
+        "$component_ref": "idea_selection_gate"
+      },
+      "destination_input": "brief"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "ideaCount:start->idea_selection_gate.ideaCount",
+      "name": "ideaCount:start->idea_selection_gate",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "ideaCount",
+      "destination_node": {
+        "$component_ref": "idea_selection_gate"
+      },
+      "destination_input": "ideaCount"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "selectedIdeaJson:idea_selection_gate->reserve_idea.selectedIdeaJson",
+      "name": "selectedIdeaJson:idea_selection_gate->reserve_idea",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "idea_selection_gate"
+      },
+      "source_output": "selectedIdeaJson",
+      "destination_node": {
+        "$component_ref": "reserve_idea"
+      },
+      "destination_input": "selectedIdeaJson"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "ideas:prepare_ideas->reserve_idea.ideas",
+      "name": "ideas:prepare_ideas->reserve_idea",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "prepare_ideas"
+      },
+      "source_output": "ideas",
+      "destination_node": {
+        "$component_ref": "reserve_idea"
+      },
+      "destination_input": "ideas"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "cinatra_run_id:start->reserve_idea.cinatra_run_id",
+      "name": "cinatra_run_id:start->reserve_idea",
+      "description": "",
+      "metadata": {},
       "source_node": {
         "$component_ref": "start"
       },
       "source_output": "cinatra_run_id",
       "destination_node": {
-        "$component_ref": "selected_idea"
+        "$component_ref": "reserve_idea"
       },
       "destination_input": "cinatra_run_id"
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "selected_idea_idea__draft_flow_idea",
+      "id": "idea:reserve_idea->draft_flow.idea",
+      "name": "idea:reserve_idea->draft_flow",
+      "description": "",
+      "metadata": {},
       "source_node": {
-        "$component_ref": "selected_idea"
+        "$component_ref": "reserve_idea"
       },
       "source_output": "idea",
       "destination_node": {
@@ -425,7 +480,10 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "start_tone__draft_flow_tone",
+      "id": "tone:start->draft_flow.tone",
+      "name": "tone:start->draft_flow",
+      "description": "",
+      "metadata": {},
       "source_node": {
         "$component_ref": "start"
       },
@@ -437,7 +495,10 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "start_length__draft_flow_length",
+      "id": "length:start->draft_flow.length",
+      "name": "length:start->draft_flow",
+      "description": "",
+      "metadata": {},
       "source_node": {
         "$component_ref": "start"
       },
@@ -449,7 +510,10 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "start_referenceContent__draft_flow_referenceContent",
+      "id": "referenceContent:start->draft_flow.referenceContent",
+      "name": "referenceContent:start->draft_flow",
+      "description": "",
+      "metadata": {},
       "source_node": {
         "$component_ref": "start"
       },
@@ -461,7 +525,10 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "start_audience__draft_flow_audience",
+      "id": "audience:start->draft_flow.audience",
+      "name": "audience:start->draft_flow",
+      "description": "",
+      "metadata": {},
       "source_node": {
         "$component_ref": "start"
       },
@@ -473,7 +540,10 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "start_projectId__draft_flow_projectId",
+      "id": "projectId:start->draft_flow.projectId",
+      "name": "projectId:start->draft_flow",
+      "description": "",
+      "metadata": {},
       "source_node": {
         "$component_ref": "start"
       },
@@ -485,7 +555,10 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "start_cinatra_run_id__draft_flow_cinatra_run_id",
+      "id": "cinatra_run_id:start->draft_flow.cinatra_run_id",
+      "name": "cinatra_run_id:start->draft_flow",
+      "description": "",
+      "metadata": {},
       "source_node": {
         "$component_ref": "start"
       },
@@ -497,47 +570,209 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "draft_flow_draft__draft_projection_draft",
+      "id": "title:draft_flow->write_draft.title",
+      "name": "title:draft_flow->write_draft",
+      "description": "",
+      "metadata": {},
       "source_node": {
         "$component_ref": "draft_flow"
       },
-      "source_output": "draft",
+      "source_output": "title",
       "destination_node": {
-        "$component_ref": "draft_projection"
+        "$component_ref": "write_draft"
       },
-      "destination_input": "draft"
+      "destination_input": "title"
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "draft_flow_draft__emit_draft_payload_draft",
+      "id": "content:draft_flow->write_draft.content",
+      "name": "content:draft_flow->write_draft",
+      "description": "",
+      "metadata": {},
       "source_node": {
         "$component_ref": "draft_flow"
       },
-      "source_output": "draft",
+      "source_output": "content",
+      "destination_node": {
+        "$component_ref": "write_draft"
+      },
+      "destination_input": "content"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "cinatra_run_id:start->write_draft.cinatra_run_id",
+      "name": "cinatra_run_id:start->write_draft",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "cinatra_run_id",
+      "destination_node": {
+        "$component_ref": "write_draft"
+      },
+      "destination_input": "cinatra_run_id"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "content:draft_flow->image_flow.post",
+      "name": "content:draft_flow->image_flow",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "draft_flow"
+      },
+      "source_output": "content",
+      "destination_node": {
+        "$component_ref": "image_flow"
+      },
+      "destination_input": "post"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "artifactId:write_draft->image_flow.postArtifactId",
+      "name": "artifactId:write_draft->image_flow",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "write_draft"
+      },
+      "source_output": "artifactId",
+      "destination_node": {
+        "$component_ref": "image_flow"
+      },
+      "destination_input": "postArtifactId"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "projectId:start->image_flow.projectId",
+      "name": "projectId:start->image_flow",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "projectId",
+      "destination_node": {
+        "$component_ref": "image_flow"
+      },
+      "destination_input": "projectId"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "cinatra_run_id:start->image_flow.cinatra_run_id",
+      "name": "cinatra_run_id:start->image_flow",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "cinatra_run_id",
+      "destination_node": {
+        "$component_ref": "image_flow"
+      },
+      "destination_input": "cinatra_run_id"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "ideaArtifactId:reserve_idea->complete_relation.ideaArtifactId",
+      "name": "ideaArtifactId:reserve_idea->complete_relation",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "reserve_idea"
+      },
+      "source_output": "ideaArtifactId",
+      "destination_node": {
+        "$component_ref": "complete_relation"
+      },
+      "destination_input": "ideaArtifactId"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "artifactId:write_draft->complete_relation.draftArtifactId",
+      "name": "artifactId:write_draft->complete_relation",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "write_draft"
+      },
+      "source_output": "artifactId",
+      "destination_node": {
+        "$component_ref": "complete_relation"
+      },
+      "destination_input": "draftArtifactId"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "representationRevisionId:write_draft->complete_relation.draftRevisionId",
+      "name": "representationRevisionId:write_draft->complete_relation",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "write_draft"
+      },
+      "source_output": "representationRevisionId",
+      "destination_node": {
+        "$component_ref": "complete_relation"
+      },
+      "destination_input": "draftRevisionId"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "cinatra_run_id:start->complete_relation.cinatra_run_id",
+      "name": "cinatra_run_id:start->complete_relation",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "cinatra_run_id",
+      "destination_node": {
+        "$component_ref": "complete_relation"
+      },
+      "destination_input": "cinatra_run_id"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "content:draft_flow->emit_draft_payload.content",
+      "name": "content:draft_flow->emit_draft_payload",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "draft_flow"
+      },
+      "source_output": "content",
       "destination_node": {
         "$component_ref": "emit_draft_payload"
       },
-      "destination_input": "draft"
+      "destination_input": "content"
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "start_cinatra_run_id__draft_projection_cinatra_run_id",
+      "id": "reviewTargets:complete_relation->draft_review_gate.reviewTargets",
+      "name": "reviewTargets:complete_relation->draft_review_gate",
+      "description": "",
+      "metadata": {},
       "source_node": {
-        "$component_ref": "start"
+        "$component_ref": "complete_relation"
       },
-      "source_output": "cinatra_run_id",
+      "source_output": "reviewTargets",
       "destination_node": {
-        "$component_ref": "draft_projection"
+        "$component_ref": "draft_review_gate"
       },
-      "destination_input": "cinatra_run_id"
+      "destination_input": "reviewTargets"
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "draft_projection_postTitle__linkedin_flow_postTitle",
+      "id": "title:draft_flow->linkedin_flow.postTitle",
+      "name": "title:draft_flow->linkedin_flow",
+      "description": "",
+      "metadata": {},
       "source_node": {
-        "$component_ref": "draft_projection"
+        "$component_ref": "draft_flow"
       },
-      "source_output": "postTitle",
+      "source_output": "title",
       "destination_node": {
         "$component_ref": "linkedin_flow"
       },
@@ -545,11 +780,14 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "draft_projection_postExcerpt__linkedin_flow_postExcerpt",
+      "id": "excerpt:draft_flow->linkedin_flow.postExcerpt",
+      "name": "excerpt:draft_flow->linkedin_flow",
+      "description": "",
+      "metadata": {},
       "source_node": {
-        "$component_ref": "draft_projection"
+        "$component_ref": "draft_flow"
       },
-      "source_output": "postExcerpt",
+      "source_output": "excerpt",
       "destination_node": {
         "$component_ref": "linkedin_flow"
       },
@@ -557,11 +795,14 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "draft_projection_blogPostContent__linkedin_flow_blogPostContent",
+      "id": "content:draft_flow->linkedin_flow.blogPostContent",
+      "name": "content:draft_flow->linkedin_flow",
+      "description": "",
+      "metadata": {},
       "source_node": {
-        "$component_ref": "draft_projection"
+        "$component_ref": "draft_flow"
       },
-      "source_output": "blogPostContent",
+      "source_output": "content",
       "destination_node": {
         "$component_ref": "linkedin_flow"
       },
@@ -569,55 +810,10 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "draft_flow_draft__image_flow_draft",
-      "source_node": {
-        "$component_ref": "draft_flow"
-      },
-      "source_output": "draft",
-      "destination_node": {
-        "$component_ref": "image_flow"
-      },
-      "destination_input": "draft"
-    },
-    {
-      "component_type": "DataFlowEdge",
-      "name": "start_imageCount__image_flow_count",
-      "source_node": {
-        "$component_ref": "start"
-      },
-      "source_output": "imageCount",
-      "destination_node": {
-        "$component_ref": "image_flow"
-      },
-      "destination_input": "count"
-    },
-    {
-      "component_type": "DataFlowEdge",
-      "name": "start_projectId__image_flow_projectId",
-      "source_node": {
-        "$component_ref": "start"
-      },
-      "source_output": "projectId",
-      "destination_node": {
-        "$component_ref": "image_flow"
-      },
-      "destination_input": "projectId"
-    },
-    {
-      "component_type": "DataFlowEdge",
-      "name": "start_cinatra_run_id__image_flow_cinatra_run_id",
-      "source_node": {
-        "$component_ref": "start"
-      },
-      "source_output": "cinatra_run_id",
-      "destination_node": {
-        "$component_ref": "image_flow"
-      },
-      "destination_input": "cinatra_run_id"
-    },
-    {
-      "component_type": "DataFlowEdge",
-      "name": "start_blogPostUrl__linkedin_flow_blogPostUrl",
+      "id": "blogPostUrl:start->linkedin_flow.blogPostUrl",
+      "name": "blogPostUrl:start->linkedin_flow",
+      "description": "",
+      "metadata": {},
       "source_node": {
         "$component_ref": "start"
       },
@@ -629,7 +825,10 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "start_companyUrl__linkedin_flow_companyUrl",
+      "id": "companyUrl:start->linkedin_flow.companyUrl",
+      "name": "companyUrl:start->linkedin_flow",
+      "description": "",
+      "metadata": {},
       "source_node": {
         "$component_ref": "start"
       },
@@ -641,7 +840,10 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "start_cinatra_run_id__linkedin_flow_cinatra_run_id",
+      "id": "cinatra_run_id:start->linkedin_flow.cinatra_run_id",
+      "name": "cinatra_run_id:start->linkedin_flow",
+      "description": "",
+      "metadata": {},
       "source_node": {
         "$component_ref": "start"
       },
@@ -653,43 +855,40 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "idea_flow_ideas__end_ideas",
+      "id": "post:linkedin_flow->linkedin_review_gate.linkedinPost",
+      "name": "post:linkedin_flow->linkedin_review_gate",
+      "description": "",
+      "metadata": {},
       "source_node": {
-        "$component_ref": "idea_flow"
+        "$component_ref": "linkedin_flow"
       },
-      "source_output": "ideas",
+      "source_output": "post",
       "destination_node": {
-        "$component_ref": "end"
+        "$component_ref": "linkedin_review_gate"
       },
-      "destination_input": "ideas"
+      "destination_input": "linkedinPost"
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "draft_flow_draft__end_draft",
+      "id": "title:linkedin_flow->linkedin_review_gate.linkedinTitle",
+      "name": "title:linkedin_flow->linkedin_review_gate",
+      "description": "",
+      "metadata": {},
       "source_node": {
-        "$component_ref": "draft_flow"
+        "$component_ref": "linkedin_flow"
       },
-      "source_output": "draft",
+      "source_output": "title",
       "destination_node": {
-        "$component_ref": "end"
+        "$component_ref": "linkedin_review_gate"
       },
-      "destination_input": "draft"
+      "destination_input": "linkedinTitle"
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "image_flow_prompts__end_imagePrompts",
-      "source_node": {
-        "$component_ref": "image_flow"
-      },
-      "source_output": "prompts",
-      "destination_node": {
-        "$component_ref": "end"
-      },
-      "destination_input": "imagePrompts"
-    },
-    {
-      "component_type": "DataFlowEdge",
-      "name": "linkedin_flow_post__end_linkedinPost",
+      "id": "post:linkedin_flow->end.linkedinPost",
+      "name": "post:linkedin_flow->end",
+      "description": "",
+      "metadata": {},
       "source_node": {
         "$component_ref": "linkedin_flow"
       },
@@ -701,7 +900,10 @@
     },
     {
       "component_type": "DataFlowEdge",
-      "name": "linkedin_flow_title__end_linkedinTitle",
+      "id": "title:linkedin_flow->end.linkedinTitle",
+      "name": "title:linkedin_flow->end",
+      "description": "",
+      "metadata": {},
       "source_node": {
         "$component_ref": "linkedin_flow"
       },
@@ -710,30 +912,6 @@
         "$component_ref": "end"
       },
       "destination_input": "linkedinTitle"
-    },
-    {
-      "component_type": "DataFlowEdge",
-      "name": "draft_projection_postTitle__end_draftTitle",
-      "source_node": {
-        "$component_ref": "draft_projection"
-      },
-      "source_output": "postTitle",
-      "destination_node": {
-        "$component_ref": "end"
-      },
-      "destination_input": "draftTitle"
-    },
-    {
-      "component_type": "DataFlowEdge",
-      "name": "draft_projection_blogPostContent__end_draftContent",
-      "source_node": {
-        "$component_ref": "draft_projection"
-      },
-      "source_output": "blogPostContent",
-      "destination_node": {
-        "$component_ref": "end"
-      },
-      "destination_input": "draftContent"
     }
   ],
   "$referenced_components": {
@@ -747,13 +925,8 @@
             "brief"
           ],
           "hidden": [
-            "audience",
-            "tone",
-            "length",
-            "referenceContent",
             "companyUrl",
             "blogPostUrl",
-            "imageCount",
             "projectId",
             "cinatra_run_id"
           ],
@@ -787,6 +960,11 @@
           "default": ""
         },
         {
+          "title": "ideaCount",
+          "type": "integer",
+          "default": 5
+        },
+        {
           "title": "companyUrl",
           "type": "string",
           "default": ""
@@ -795,11 +973,6 @@
           "title": "blogPostUrl",
           "type": "string",
           "default": ""
-        },
-        {
-          "title": "imageCount",
-          "type": "integer",
-          "default": 1
         },
         {
           "title": "projectId",
@@ -813,63 +986,24 @@
         }
       ]
     },
-    "blog-idea-generator-agent-subflow": {
-      "agentspec_version": "26.1.0",
-      "component_type": "Flow",
-      "id": "blog-idea-generator-agent-subflow",
-      "name": "Blog Idea Generator Agent",
+    "prepare_ideas": {
+      "component_type": "ApiNode",
+      "id": "prepare_ideas",
+      "name": "Read the organisation's unused blog ideas",
+      "url": "{{CINATRA_BASE_URL}}/api/agents/passthrough",
+      "http_method": "POST",
+      "data": {
+        "tool": "blog_pipeline_ideas",
+        "input": {
+          "op": "prepare",
+          "ideaType": "@cinatra-ai/blog-idea-artifact:blog-idea",
+          "cinatra_agent_run_id": "{{ cinatra_run_id }}"
+        },
+        "agent_run_id": "{{ cinatra_run_id }}"
+      },
       "inputs": [
         {
-          "title": "brief",
-          "type": "string"
-        },
-        {
-          "title": "audience",
-          "type": "string",
-          "default": ""
-        },
-        {
-          "title": "count",
-          "type": "integer",
-          "default": 5
-        },
-        {
-          "title": "tone",
-          "type": "string",
-          "default": ""
-        },
-        {
-          "title": "existingIdeasContext",
-          "type": "array",
-          "json_schema": {
-            "items": {
-              "type": "string"
-            }
-          },
-          "default": []
-        },
-        {
-          "title": "referenceContent",
-          "type": "string",
-          "default": ""
-        },
-        {
           "title": "cinatra_run_id",
-          "type": "string",
-          "default": ""
-        },
-        {
-          "title": "ideaContextParentPackageName",
-          "type": "string",
-          "default": "@cinatra-ai/blog-idea-generator-agent"
-        },
-        {
-          "title": "ideaContextSlotId",
-          "type": "string",
-          "default": "ideaContext"
-        },
-        {
-          "title": "projectId",
           "type": "string",
           "default": ""
         }
@@ -882,1211 +1016,186 @@
             "items": {
               "type": "object"
             }
-          }
+          },
+          "default": []
         },
         {
-          "title": "notes",
-          "type": "string"
+          "title": "reason",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "ok",
+          "type": "boolean",
+          "default": false
         }
       ],
-      "start_node": {
-        "$component_ref": "blog-idea-generator-agent__start"
-      },
-      "nodes": [
-        {
-          "$component_ref": "blog-idea-generator-agent__start"
-        },
-        {
-          "$component_ref": "blog-idea-generator-agent__context_ideaContext"
-        },
-        {
-          "$component_ref": "blog-idea-generator-agent__generate"
-        },
-        {
-          "$component_ref": "blog-idea-generator-agent__end"
-        }
-      ],
-      "control_flow_connections": [
-        {
-          "component_type": "ControlFlowEdge",
-          "name": "blog-idea-generator-agent__start_to_generate",
-          "from_node": {
-            "$component_ref": "blog-idea-generator-agent__start"
-          },
-          "to_node": {
-            "$component_ref": "blog-idea-generator-agent__context_ideaContext"
-          }
-        },
-        {
-          "component_type": "ControlFlowEdge",
-          "name": "blog-idea-generator-agent__generate_to_end",
-          "from_node": {
-            "$component_ref": "blog-idea-generator-agent__generate"
-          },
-          "to_node": {
-            "$component_ref": "blog-idea-generator-agent__end"
-          }
-        },
-        {
-          "component_type": "ControlFlowEdge",
-          "name": "blog-idea-generator-agent__context_ideaContext_to_generate",
-          "from_node": {
-            "$component_ref": "blog-idea-generator-agent__context_ideaContext"
-          },
-          "to_node": {
-            "$component_ref": "blog-idea-generator-agent__generate"
-          }
-        }
-      ],
-      "data_flow_connections": [
-        {
-          "component_type": "DataFlowEdge",
-          "name": "blog-idea-generator-agent__start_brief_to_generate_brief",
-          "source_node": {
-            "$component_ref": "blog-idea-generator-agent__start"
-          },
-          "source_output": "brief",
-          "destination_node": {
-            "$component_ref": "blog-idea-generator-agent__generate"
-          },
-          "destination_input": "brief"
-        },
-        {
-          "component_type": "DataFlowEdge",
-          "name": "blog-idea-generator-agent__start_audience_to_generate_audience",
-          "source_node": {
-            "$component_ref": "blog-idea-generator-agent__start"
-          },
-          "source_output": "audience",
-          "destination_node": {
-            "$component_ref": "blog-idea-generator-agent__generate"
-          },
-          "destination_input": "audience"
-        },
-        {
-          "component_type": "DataFlowEdge",
-          "name": "blog-idea-generator-agent__start_count_to_generate_count",
-          "source_node": {
-            "$component_ref": "blog-idea-generator-agent__start"
-          },
-          "source_output": "count",
-          "destination_node": {
-            "$component_ref": "blog-idea-generator-agent__generate"
-          },
-          "destination_input": "count"
-        },
-        {
-          "component_type": "DataFlowEdge",
-          "name": "blog-idea-generator-agent__start_tone_to_generate_tone",
-          "source_node": {
-            "$component_ref": "blog-idea-generator-agent__start"
-          },
-          "source_output": "tone",
-          "destination_node": {
-            "$component_ref": "blog-idea-generator-agent__generate"
-          },
-          "destination_input": "tone"
-        },
-        {
-          "component_type": "DataFlowEdge",
-          "name": "blog-idea-generator-agent__start_existingIdeasContext_to_generate_existingIdeasContext",
-          "source_node": {
-            "$component_ref": "blog-idea-generator-agent__start"
-          },
-          "source_output": "existingIdeasContext",
-          "destination_node": {
-            "$component_ref": "blog-idea-generator-agent__generate"
-          },
-          "destination_input": "existingIdeasContext"
-        },
-        {
-          "component_type": "DataFlowEdge",
-          "name": "blog-idea-generator-agent__start_referenceContent_to_generate_referenceContent",
-          "source_node": {
-            "$component_ref": "blog-idea-generator-agent__start"
-          },
-          "source_output": "referenceContent",
-          "destination_node": {
-            "$component_ref": "blog-idea-generator-agent__generate"
-          },
-          "destination_input": "referenceContent"
-        },
-        {
-          "component_type": "DataFlowEdge",
-          "name": "blog-idea-generator-agent__generate_ideas_to_end_ideas",
-          "source_node": {
-            "$component_ref": "blog-idea-generator-agent__generate"
-          },
-          "source_output": "ideas",
-          "destination_node": {
-            "$component_ref": "blog-idea-generator-agent__end"
-          },
-          "destination_input": "ideas"
-        },
-        {
-          "component_type": "DataFlowEdge",
-          "name": "blog-idea-generator-agent__generate_notes_to_end_notes",
-          "source_node": {
-            "$component_ref": "blog-idea-generator-agent__generate"
-          },
-          "source_output": "notes",
-          "destination_node": {
-            "$component_ref": "blog-idea-generator-agent__end"
-          },
-          "destination_input": "notes"
-        },
-        {
-          "component_type": "DataFlowEdge",
-          "name": "blog-idea-generator-agent__start_cinatra_run_id_to_generate_agent_run_id",
-          "source_node": {
-            "$component_ref": "blog-idea-generator-agent__start"
-          },
-          "source_output": "cinatra_run_id",
-          "destination_node": {
-            "$component_ref": "blog-idea-generator-agent__generate"
-          },
-          "destination_input": "agent_run_id"
-        },
-        {
-          "component_type": "DataFlowEdge",
-          "name": "blog-idea-generator-agent__start_cinatra_run_id_to_context_ideaContext_parentRunId",
-          "source_node": {
-            "$component_ref": "blog-idea-generator-agent__start"
-          },
-          "source_output": "cinatra_run_id",
-          "destination_node": {
-            "$component_ref": "blog-idea-generator-agent__context_ideaContext"
-          },
-          "destination_input": "parentRunId"
-        },
-        {
-          "component_type": "DataFlowEdge",
-          "name": "blog-idea-generator-agent__start_ideaContextParentPackageName_to_context_ideaContext_parentPackageName",
-          "source_node": {
-            "$component_ref": "blog-idea-generator-agent__start"
-          },
-          "source_output": "ideaContextParentPackageName",
-          "destination_node": {
-            "$component_ref": "blog-idea-generator-agent__context_ideaContext"
-          },
-          "destination_input": "parentPackageName"
-        },
-        {
-          "component_type": "DataFlowEdge",
-          "name": "blog-idea-generator-agent__start_ideaContextSlotId_to_context_ideaContext_slotId",
-          "source_node": {
-            "$component_ref": "blog-idea-generator-agent__start"
-          },
-          "source_output": "ideaContextSlotId",
-          "destination_node": {
-            "$component_ref": "blog-idea-generator-agent__context_ideaContext"
-          },
-          "destination_input": "slotId"
-        },
-        {
-          "component_type": "DataFlowEdge",
-          "name": "blog-idea-generator-agent__start_projectId_to_context_ideaContext_projectId",
-          "source_node": {
-            "$component_ref": "blog-idea-generator-agent__start"
-          },
-          "source_output": "projectId",
-          "destination_node": {
-            "$component_ref": "blog-idea-generator-agent__context_ideaContext"
-          },
-          "destination_input": "projectId"
-        },
-        {
-          "component_type": "DataFlowEdge",
-          "name": "blog-idea-generator-agent__context_ideaContext_contextSlotBindings_to_generate",
-          "source_node": {
-            "$component_ref": "blog-idea-generator-agent__context_ideaContext"
-          },
-          "source_output": "contextSlotBindings",
-          "destination_node": {
-            "$component_ref": "blog-idea-generator-agent__generate"
-          },
-          "destination_input": "contextSlotBindings"
-        }
-      ],
-      "$referenced_components": {
-        "blog-idea-generator-agent__start": {
-          "component_type": "StartNode",
-          "id": "blog-idea-generator-agent__start",
-          "name": "Inputs",
-          "metadata": {
-            "cinatra": {
-              "required": [
-                "brief"
-              ],
-              "hidden": [
-                "audience",
-                "count",
-                "tone",
-                "existingIdeasContext",
-                "referenceContent",
-                "cinatra_run_id",
-                "ideaContextParentPackageName",
-                "ideaContextSlotId",
-                "projectId"
-              ]
-            }
-          },
-          "inputs": [
-            {
-              "title": "brief",
-              "type": "string"
-            },
-            {
-              "title": "audience",
-              "type": "string",
-              "default": ""
-            },
-            {
-              "title": "count",
-              "type": "integer",
-              "default": 5
-            },
-            {
-              "title": "tone",
-              "type": "string",
-              "default": ""
-            },
-            {
-              "title": "existingIdeasContext",
-              "type": "array",
-              "json_schema": {
-                "items": {
-                  "type": "string"
-                }
-              },
-              "default": []
-            },
-            {
-              "title": "referenceContent",
-              "type": "string",
-              "default": ""
-            },
-            {
-              "title": "cinatra_run_id",
-              "type": "string",
-              "default": ""
-            },
-            {
-              "title": "ideaContextParentPackageName",
-              "type": "string",
-              "default": "@cinatra-ai/blog-idea-generator-agent"
-            },
-            {
-              "title": "ideaContextSlotId",
-              "type": "string",
-              "default": "ideaContext"
-            },
-            {
-              "title": "projectId",
-              "type": "string",
-              "default": ""
-            }
-          ]
-        },
-        "blog-idea-generator-agent__generate": {
-          "component_type": "ApiNode",
-          "id": "blog-idea-generator-agent__generate",
-          "name": "Generate blog ideas",
-          "url": "{{CINATRA_BASE_URL}}/api/llm-bridge",
-          "http_method": "POST",
-          "data": {
-            "agent_id": "blog-idea-generator-agent",
-            "system": "You are a stateless blog-idea-generator agent. Follow the SKILL.md step-by-step. Return a single JSON object {ideas:[{title, summary, outline:[...]}], notes} \u2014 nothing else; no markdown wrapping; no prose preface.",
-            "user": "Generate count distinct blog post ideas for the brief below. Each idea needs a title (\u226480 chars), a 1-2 sentence summary, and 3-7 outline points covering the post arc. Respect tone if provided. Avoid topics in existingIdeasContext.\nInputs:\n- brief: {{ brief }}\n- audience: {{ audience }}\n- count: {{ count }}\n- tone: {{ tone }}\n- existingIdeasContext: {{ existingIdeasContext }}\n- referenceContent: {{ referenceContent }}\n- contextSlotBindings: {{ contextSlotBindings }}",
-            "agent_run_id": "{{ agent_run_id }}",
-            "cinatra_llm": {
-              "preferredProvider": "openai",
-              "preferredModel": "gpt-5.5"
-            }
-          },
-          "inputs": [
-            {
-              "title": "brief",
-              "type": "string"
-            },
-            {
-              "title": "audience",
-              "type": "string"
-            },
-            {
-              "title": "count",
-              "type": "integer"
-            },
-            {
-              "title": "tone",
-              "type": "string"
-            },
-            {
-              "title": "existingIdeasContext",
-              "type": "array",
-              "json_schema": {
-                "items": {
-                  "type": "string"
-                }
-              }
-            },
-            {
-              "title": "referenceContent",
-              "type": "string"
-            },
-            {
-              "title": "agent_run_id",
-              "type": "string"
-            },
-            {
-              "title": "contextSlotBindings",
-              "type": "array",
-              "json_schema": {
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "artifactId": {
-                      "type": "string"
-                    },
-                    "representationRevisionId": {
-                      "type": "string"
-                    },
-                    "semanticAssertionId": {
-                      "type": "string"
-                    },
-                    "extension": {
-                      "type": "string"
-                    },
-                    "sourceScope": {
-                      "type": "string"
-                    },
-                    "ownerId": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "outputs": [
-            {
-              "title": "ideas",
-              "type": "array",
-              "json_schema": {
-                "items": {
-                  "type": "object"
-                }
-              }
-            },
-            {
-              "title": "notes",
-              "type": "string"
-            }
-          ],
-          "metadata": {
-            "cinatra": {
-              "riskClass": "write_safe",
-              "requiresApproval": false,
-              "packageName": "@cinatra-ai/blog-idea-generator-agent",
-              "description": "Single ApiNode \u2192 /api/llm-bridge. Bridge auto-discovers SKILL.md from agents/cinatra/blog-idea-generator-agent/skills/blog-idea-generator-agent/SKILL.md (via agent_id). metadata.cinatra.toolboxes is INTENTIONALLY OMITTED so default toolbox injection runs; the SKILL.md instructs the LLM NOT to call any MCP primitive \u2014 ideas are generated purely from inline inputs. No HITL gates; the LLM returns the JSON envelope and the run completes."
-            }
-          }
-        },
-        "blog-idea-generator-agent__end": {
-          "component_type": "EndNode",
-          "id": "blog-idea-generator-agent__end",
-          "name": "End",
-          "outputs": [
-            {
-              "title": "ideas",
-              "type": "array",
-              "json_schema": {
-                "items": {
-                  "type": "object"
-                }
-              },
-              "default": []
-            },
-            {
-              "title": "notes",
-              "type": "string",
-              "default": ""
-            }
-          ]
-        },
-        "blog-idea-generator-agent__context-ideaContext-subflow": {
-          "agentspec_version": "26.1.0",
-          "component_type": "Flow",
-          "id": "blog-idea-generator-agent__context-ideaContext-subflow",
-          "name": "Context Agent (ideaContext)",
-          "inputs": [
-            {
-              "title": "parentRunId",
-              "type": "string"
-            },
-            {
-              "title": "parentPackageName",
-              "type": "string"
-            },
-            {
-              "title": "slotId",
-              "type": "string"
-            },
-            {
-              "title": "projectId",
-              "type": "string",
-              "default": ""
-            }
-          ],
-          "outputs": [
-            {
-              "title": "contextSlotBindings",
-              "type": "array",
-              "json_schema": {
-                "items": {
-                  "type": "object"
-                }
-              }
-            }
-          ],
-          "start_node": {
-            "$component_ref": "ctx-ideaContext-start"
-          },
-          "nodes": [
-            {
-              "$component_ref": "ctx-ideaContext-start"
-            },
-            {
-              "$component_ref": "ctx-ideaContext-resolve_context"
-            },
-            {
-              "$component_ref": "ctx-ideaContext-select_mode"
-            },
-            {
-              "$component_ref": "ctx-ideaContext-emit_context_payload"
-            },
-            {
-              "$component_ref": "ctx-ideaContext-context_select_gate"
-            },
-            {
-              "$component_ref": "ctx-ideaContext-finalize_interactive"
-            },
-            {
-              "$component_ref": "ctx-ideaContext-finalize_autonomous"
-            },
-            {
-              "$component_ref": "ctx-ideaContext-end"
-            }
-          ],
-          "control_flow_connections": [
-            {
-              "component_type": "ControlFlowEdge",
-              "name": "ctx-ideaContext-start_to_resolve",
-              "from_node": {
-                "$component_ref": "ctx-ideaContext-start"
-              },
-              "to_node": {
-                "$component_ref": "ctx-ideaContext-resolve_context"
-              }
-            },
-            {
-              "component_type": "ControlFlowEdge",
-              "name": "ctx-ideaContext-resolve_to_select",
-              "from_node": {
-                "$component_ref": "ctx-ideaContext-resolve_context"
-              },
-              "to_node": {
-                "$component_ref": "ctx-ideaContext-select_mode"
-              }
-            },
-            {
-              "component_type": "ControlFlowEdge",
-              "name": "ctx-ideaContext-select_default_to_emit",
-              "from_node": {
-                "$component_ref": "ctx-ideaContext-select_mode"
-              },
-              "to_node": {
-                "$component_ref": "ctx-ideaContext-emit_context_payload"
-              },
-              "from_branch": "default"
-            },
-            {
-              "component_type": "ControlFlowEdge",
-              "name": "ctx-ideaContext-emit_to_gate",
-              "from_node": {
-                "$component_ref": "ctx-ideaContext-emit_context_payload"
-              },
-              "to_node": {
-                "$component_ref": "ctx-ideaContext-context_select_gate"
-              }
-            },
-            {
-              "component_type": "ControlFlowEdge",
-              "name": "ctx-ideaContext-gate_to_finalize_interactive",
-              "from_node": {
-                "$component_ref": "ctx-ideaContext-context_select_gate"
-              },
-              "to_node": {
-                "$component_ref": "ctx-ideaContext-finalize_interactive"
-              }
-            },
-            {
-              "component_type": "ControlFlowEdge",
-              "name": "ctx-ideaContext-finalize_interactive_to_end",
-              "from_node": {
-                "$component_ref": "ctx-ideaContext-finalize_interactive"
-              },
-              "to_node": {
-                "$component_ref": "ctx-ideaContext-end"
-              }
-            },
-            {
-              "component_type": "ControlFlowEdge",
-              "name": "ctx-ideaContext-select_autonomous_to_finalize",
-              "from_node": {
-                "$component_ref": "ctx-ideaContext-select_mode"
-              },
-              "to_node": {
-                "$component_ref": "ctx-ideaContext-finalize_autonomous"
-              },
-              "from_branch": "autonomous"
-            },
-            {
-              "component_type": "ControlFlowEdge",
-              "name": "ctx-ideaContext-finalize_autonomous_to_end",
-              "from_node": {
-                "$component_ref": "ctx-ideaContext-finalize_autonomous"
-              },
-              "to_node": {
-                "$component_ref": "ctx-ideaContext-end"
-              }
-            }
-          ],
-          "data_flow_connections": [
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-start_parentRunId_to_resolve",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-start"
-              },
-              "source_output": "parentRunId",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-resolve_context"
-              },
-              "destination_input": "parentRunId"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-start_parentPackageName_to_resolve",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-start"
-              },
-              "source_output": "parentPackageName",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-resolve_context"
-              },
-              "destination_input": "parentPackageName"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-start_slotId_to_resolve",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-start"
-              },
-              "source_output": "slotId",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-resolve_context"
-              },
-              "destination_input": "slotId"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-start_projectId_to_resolve",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-start"
-              },
-              "source_output": "projectId",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-resolve_context"
-              },
-              "destination_input": "projectId"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-resolve_selectionMode_to_select",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-resolve_context"
-              },
-              "source_output": "selectionMode",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-select_mode"
-              },
-              "destination_input": "selectionMode"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-resolve_candidates_to_emit",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-resolve_context"
-              },
-              "source_output": "candidates",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-emit_context_payload"
-              },
-              "destination_input": "candidates"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-resolve_slotMeta_to_emit",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-resolve_context"
-              },
-              "source_output": "slotMeta",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-emit_context_payload"
-              },
-              "destination_input": "slotMeta"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-resolve_selectedRefs_to_emit",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-resolve_context"
-              },
-              "source_output": "selectedRefs",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-emit_context_payload"
-              },
-              "destination_input": "selectedRefs"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-gate_userResponse_to_finalize_interactive",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-context_select_gate"
-              },
-              "source_output": "userResponse",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-finalize_interactive"
-              },
-              "destination_input": "userResponse"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-start_parentRunId_to_finalize_interactive",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-start"
-              },
-              "source_output": "parentRunId",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-finalize_interactive"
-              },
-              "destination_input": "parentRunId"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-start_parentPackageName_to_finalize_interactive",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-start"
-              },
-              "source_output": "parentPackageName",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-finalize_interactive"
-              },
-              "destination_input": "parentPackageName"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-start_slotId_to_finalize_interactive",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-start"
-              },
-              "source_output": "slotId",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-finalize_interactive"
-              },
-              "destination_input": "slotId"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-start_projectId_to_finalize_interactive",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-start"
-              },
-              "source_output": "projectId",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-finalize_interactive"
-              },
-              "destination_input": "projectId"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-resolve_selectionMode_to_finalize_interactive",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-resolve_context"
-              },
-              "source_output": "selectionMode",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-finalize_interactive"
-              },
-              "destination_input": "selectionMode"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-start_parentRunId_to_finalize_autonomous",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-start"
-              },
-              "source_output": "parentRunId",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-finalize_autonomous"
-              },
-              "destination_input": "parentRunId"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-start_parentPackageName_to_finalize_autonomous",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-start"
-              },
-              "source_output": "parentPackageName",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-finalize_autonomous"
-              },
-              "destination_input": "parentPackageName"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-start_slotId_to_finalize_autonomous",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-start"
-              },
-              "source_output": "slotId",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-finalize_autonomous"
-              },
-              "destination_input": "slotId"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-start_projectId_to_finalize_autonomous",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-start"
-              },
-              "source_output": "projectId",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-finalize_autonomous"
-              },
-              "destination_input": "projectId"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-resolve_selectionMode_to_finalize_autonomous",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-resolve_context"
-              },
-              "source_output": "selectionMode",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-finalize_autonomous"
-              },
-              "destination_input": "selectionMode"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-resolve_resolutionMode_to_finalize_autonomous",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-resolve_context"
-              },
-              "source_output": "resolutionMode",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-finalize_autonomous"
-              },
-              "destination_input": "resolutionMode"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-resolve_selectedRefs_to_finalize_autonomous",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-resolve_context"
-              },
-              "source_output": "selectedRefs",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-finalize_autonomous"
-              },
-              "destination_input": "selectedRefs"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-finalize_interactive_to_end",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-finalize_interactive"
-              },
-              "source_output": "contextSlotBindings",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-end"
-              },
-              "destination_input": "contextSlotBindings"
-            },
-            {
-              "component_type": "DataFlowEdge",
-              "name": "ctx-ideaContext-finalize_autonomous_to_end",
-              "source_node": {
-                "$component_ref": "ctx-ideaContext-finalize_autonomous"
-              },
-              "source_output": "contextSlotBindings",
-              "destination_node": {
-                "$component_ref": "ctx-ideaContext-end"
-              },
-              "destination_input": "contextSlotBindings"
-            }
-          ],
-          "$referenced_components": {
-            "ctx-ideaContext-start": {
-              "component_type": "StartNode",
-              "id": "ctx-ideaContext-start",
-              "name": "Inputs",
-              "metadata": {
-                "cinatra": {
-                  "required": [
-                    "parentRunId",
-                    "parentPackageName",
-                    "slotId"
-                  ],
-                  "hidden": [
-                    "parentRunId",
-                    "parentPackageName",
-                    "slotId",
-                    "projectId"
-                  ]
-                }
-              },
-              "inputs": [
-                {
-                  "title": "parentRunId",
-                  "type": "string"
-                },
-                {
-                  "title": "parentPackageName",
-                  "type": "string"
-                },
-                {
-                  "title": "slotId",
-                  "type": "string"
-                },
-                {
-                  "title": "projectId",
-                  "type": "string",
-                  "default": ""
-                }
-              ]
-            },
-            "ctx-ideaContext-resolve_context": {
-              "component_type": "ApiNode",
-              "id": "ctx-ideaContext-resolve_context",
-              "name": "Resolve context candidates",
-              "url": "{{CINATRA_BASE_URL}}/api/context-resolve",
-              "http_method": "POST",
-              "data": {
-                "parentRunId": "{{ parentRunId }}",
-                "parentPackageName": "{{ parentPackageName }}",
-                "slotId": "{{ slotId }}",
-                "projectId": "{{ projectId }}"
-              },
-              "inputs": [
-                {
-                  "title": "parentRunId",
-                  "type": "string"
-                },
-                {
-                  "title": "parentPackageName",
-                  "type": "string"
-                },
-                {
-                  "title": "slotId",
-                  "type": "string"
-                },
-                {
-                  "title": "projectId",
-                  "type": "string",
-                  "default": ""
-                }
-              ],
-              "outputs": [
-                {
-                  "title": "candidates",
-                  "type": "array",
-                  "json_schema": {
-                    "items": {
-                      "type": "object"
-                    }
-                  }
-                },
-                {
-                  "title": "slotMeta",
-                  "type": "object"
-                },
-                {
-                  "title": "selectedRefs",
-                  "type": "array",
-                  "json_schema": {
-                    "items": {
-                      "type": "object"
-                    }
-                  }
-                },
-                {
-                  "title": "selectionMode",
-                  "type": "string"
-                },
-                {
-                  "title": "resolutionMode",
-                  "type": "string"
-                }
-              ]
-            },
-            "ctx-ideaContext-select_mode": {
-              "component_type": "BranchingNode",
-              "id": "ctx-ideaContext-select_mode",
-              "name": "Branch on selection mode",
-              "metadata": {
-                "cinatra": {
-                  "purpose": "route-autonomous-slots-around-the-HITL-gate"
-                }
-              },
-              "inputs": [
-                {
-                  "title": "selectionMode",
-                  "type": "string"
-                }
-              ],
-              "outputs": [],
-              "branches": [
-                "default",
-                "autonomous"
-              ],
-              "mapping": {
-                "autonomous": "autonomous"
-              }
-            },
-            "ctx-ideaContext-emit_context_payload": {
-              "component_type": "OutputMessageNode",
-              "id": "ctx-ideaContext-emit_context_payload",
-              "name": "Emit resolved context as agent message",
-              "inputs": [
-                {
-                  "title": "candidates",
-                  "type": "array",
-                  "json_schema": {
-                    "items": {
-                      "type": "object"
-                    }
-                  }
-                },
-                {
-                  "title": "slotMeta",
-                  "type": "object"
-                },
-                {
-                  "title": "selectedRefs",
-                  "type": "array",
-                  "json_schema": {
-                    "items": {
-                      "type": "object"
-                    }
-                  }
-                }
-              ],
-              "message": "{# pyagentspec-input-hint (do not remove): {{ candidates }} {{ slotMeta }} {{ selectedRefs }} #}{\"candidates\":{{ candidates | tojson }},\"slotMeta\":{{ slotMeta | tojson }},\"selectedRefs\":{{ selectedRefs | tojson }}}"
-            },
-            "ctx-ideaContext-context_select_gate": {
-              "component_type": "InputMessageNode",
-              "id": "ctx-ideaContext-context_select_gate",
-              "name": "Select context",
-              "metadata": {
-                "cinatra": {
-                  "riskClass": "read_only",
-                  "requiresApproval": true,
-                  "renderer": "@cinatra-ai/context-selection-agent:context-selector",
-                  "a2uiSurfaceId": "context-selection:select"
-                }
-              },
-              "outputs": [
-                {
-                  "title": "userResponse",
-                  "type": "string"
-                }
-              ]
-            },
-            "ctx-ideaContext-finalize_interactive": {
-              "component_type": "ApiNode",
-              "id": "ctx-ideaContext-finalize_interactive",
-              "name": "Finalize selected context (interactive)",
-              "url": "{{CINATRA_BASE_URL}}/api/context-finalize",
-              "http_method": "POST",
-              "data": {
-                "parentRunId": "{{ parentRunId }}",
-                "parentPackageName": "{{ parentPackageName }}",
-                "slotId": "{{ slotId }}",
-                "projectId": "{{ projectId }}",
-                "selectionMode": "{{ selectionMode }}",
-                "userResponse": "{{ userResponse }}"
-              },
-              "inputs": [
-                {
-                  "title": "parentRunId",
-                  "type": "string"
-                },
-                {
-                  "title": "parentPackageName",
-                  "type": "string"
-                },
-                {
-                  "title": "slotId",
-                  "type": "string"
-                },
-                {
-                  "title": "projectId",
-                  "type": "string",
-                  "default": ""
-                },
-                {
-                  "title": "selectionMode",
-                  "type": "string"
-                },
-                {
-                  "title": "userResponse",
-                  "type": "string"
-                }
-              ],
-              "outputs": [
-                {
-                  "title": "contextSlotBindings",
-                  "type": "array",
-                  "json_schema": {
-                    "items": {
-                      "type": "object"
-                    }
-                  }
-                }
-              ]
-            },
-            "ctx-ideaContext-finalize_autonomous": {
-              "component_type": "ApiNode",
-              "id": "ctx-ideaContext-finalize_autonomous",
-              "name": "Finalize selected context (autonomous)",
-              "url": "{{CINATRA_BASE_URL}}/api/context-finalize",
-              "http_method": "POST",
-              "data": {
-                "parentRunId": "{{ parentRunId }}",
-                "parentPackageName": "{{ parentPackageName }}",
-                "slotId": "{{ slotId }}",
-                "projectId": "{{ projectId }}",
-                "selectionMode": "{{ selectionMode }}",
-                "userResponse": "{# pyagentspec-input-hint (do not remove): {{ slotId }} {{ resolutionMode }} {{ selectedRefs }} #}{\"slotId\":{{ slotId | tojson }},\"resolutionMode\":{{ resolutionMode | tojson }},\"selectedRefs\":{{ selectedRefs | tojson }}}"
-              },
-              "inputs": [
-                {
-                  "title": "parentRunId",
-                  "type": "string"
-                },
-                {
-                  "title": "parentPackageName",
-                  "type": "string"
-                },
-                {
-                  "title": "slotId",
-                  "type": "string"
-                },
-                {
-                  "title": "projectId",
-                  "type": "string",
-                  "default": ""
-                },
-                {
-                  "title": "selectionMode",
-                  "type": "string"
-                },
-                {
-                  "title": "resolutionMode",
-                  "type": "string"
-                },
-                {
-                  "title": "selectedRefs",
-                  "type": "array",
-                  "json_schema": {
-                    "items": {
-                      "type": "object"
-                    }
-                  }
-                }
-              ],
-              "outputs": [
-                {
-                  "title": "contextSlotBindings",
-                  "type": "array",
-                  "json_schema": {
-                    "items": {
-                      "type": "object"
-                    }
-                  }
-                }
-              ]
-            },
-            "ctx-ideaContext-end": {
-              "component_type": "EndNode",
-              "id": "ctx-ideaContext-end",
-              "name": "Outputs",
-              "outputs": [
-                {
-                  "title": "contextSlotBindings",
-                  "type": "array",
-                  "json_schema": {
-                    "items": {
-                      "type": "object"
-                    }
-                  }
-                }
-              ],
-              "inputs": [
-                {
-                  "title": "contextSlotBindings",
-                  "type": "array",
-                  "json_schema": {
-                    "items": {
-                      "type": "object"
-                    }
-                  }
-                }
-              ]
-            }
-          }
-        },
-        "blog-idea-generator-agent__context_ideaContext": {
-          "component_type": "FlowNode",
-          "id": "blog-idea-generator-agent__context_ideaContext",
-          "name": "Resolve ideaContext",
-          "subflow": {
-            "$component_ref": "blog-idea-generator-agent__context-ideaContext-subflow"
-          },
-          "metadata": {
-            "cinatra": {
-              "purpose": "author-placed-context-resolution-for-ideaContext"
-            }
-          }
+      "metadata": {
+        "cinatra": {
+          "riskClass": "read_only",
+          "requiresApproval": false,
+          "packageName": "@cinatra-ai/blog-pipeline-agent",
+          "description": "The preparation step of plan (C) section 5.1: it lists every blog idea the organisation holds through the dependency this extension declares, reads each unused one, subtracts the ideas a draft already used or another run reserved, and hands the rest to the gate as the list a person chooses from. An empty list comes back with the sentence the run ends on, never with a pick."
         }
       }
     },
-    "idea_flow": {
+    "emit_ideas_payload": {
+      "component_type": "OutputMessageNode",
+      "id": "emit_ideas_payload",
+      "name": "Emit offered ideas as agent message",
+      "inputs": [
+        {
+          "title": "ideas",
+          "type": "array",
+          "json_schema": {
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      ],
+      "message": "{# pyagentspec-input-hint (do not remove): {{ ideas }} #}{\"ideas\":{{ ideas | tojson }}}"
+    },
+    "idea_selection_gate": {
+      "component_type": "InputMessageNode",
+      "id": "idea_selection_gate",
+      "name": "Select blog idea",
+      "metadata": {
+        "cinatra": {
+          "riskClass": "read_only",
+          "requiresApproval": true,
+          "renderer": "@cinatra-ai/blog-pipeline-agent:idea-selection",
+          "a2uiSurfaceId": "blog-pipeline:idea-selection",
+          "inputMessageSchema": {
+            "type": "object",
+            "x-renderer": "@cinatra-ai/blog-pipeline-agent:idea-selection",
+            "properties": {
+              "selectedIdeaJson": {
+                "type": "string",
+                "title": "Selected idea (JSON)"
+              }
+            }
+          },
+          "description": "The stored-ideas gate of plan (C) section 5.1. The list is the organisation's own unused blog ideas, read by the preparation step in front of this gate: a person picks exactly one and nothing is picked for them. The pick commits the idea's artifact and the exact revision the list offered, as one JSON string (an InputMessageNode emits one string output), never a title and never free text. With no idea left the list arrives empty with the reason the run ends on, and the reason is what the person reads; the pick is not a required field, so a person who reads that sentence can continue and the run ends at the step after this one with that same plain reason, instead of parking at a pause nothing can answer. Continuing without a pick ends the run the same way: nothing is ever picked for them. The brief and the idea count travel with the list for the road that asks for new ideas."
+        }
+      },
+      "outputs": [
+        {
+          "title": "selectedIdeaJson",
+          "type": "string",
+          "default": ""
+        }
+      ],
+      "inputs": [
+        {
+          "title": "ideas",
+          "type": "array",
+          "json_schema": {
+            "items": {
+              "type": "object"
+            }
+          },
+          "default": []
+        },
+        {
+          "title": "reason",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "brief",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "ideaCount",
+          "type": "integer",
+          "default": 5
+        }
+      ]
+    },
+    "reserve_idea": {
+      "component_type": "ApiNode",
+      "id": "reserve_idea",
+      "name": "Take the chosen idea for this run",
+      "url": "{{CINATRA_BASE_URL}}/api/agents/passthrough",
+      "http_method": "POST",
+      "data": {
+        "tool": "blog_pipeline_ideas",
+        "input": {
+          "op": "reserve",
+          "ideaType": "@cinatra-ai/blog-idea-artifact:blog-idea",
+          "pick": "{{ selectedIdeaJson }}",
+          "offered": "{{ ideas | tojson }}",
+          "cinatra_agent_run_id": "{{ cinatra_run_id }}"
+        },
+        "agent_run_id": "{{ cinatra_run_id }}"
+      },
+      "inputs": [
+        {
+          "title": "selectedIdeaJson",
+          "type": "string"
+        },
+        {
+          "title": "ideas",
+          "type": "array",
+          "json_schema": {
+            "items": {
+              "type": "object"
+            }
+          },
+          "default": []
+        },
+        {
+          "title": "cinatra_run_id",
+          "type": "string",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "idea",
+          "type": "string"
+        },
+        {
+          "title": "ideaArtifactId",
+          "type": "string"
+        },
+        {
+          "title": "ideaRevisionId",
+          "type": "string"
+        },
+        {
+          "title": "ideaTitle",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "reason",
+          "type": "string",
+          "default": ""
+        }
+      ],
+      "metadata": {
+        "cinatra": {
+          "riskClass": "write",
+          "requiresApproval": false,
+          "packageName": "@cinatra-ai/blog-pipeline-agent",
+          "description": "The pick is the reservation (plan (C) section 5.1): the chosen artifact and revision are validated against the very list the person was shown and written as one reservation row under the rule that allows one live row per idea, so of two runs offering the same idea only one takes it and the loser is told so. The idea's own words come back as the draft writer's one input. A refused pick answers with its reason and none of the three fields below, which carry no default: the run ends there rather than drafting an idea nobody chose."
+        }
+      }
+    },
+    "draft_flow": {
       "component_type": "FlowNode",
-      "id": "idea_flow",
-      "name": "Blog ideas",
+      "id": "draft_flow",
+      "name": "Blog draft",
       "subflow": {
-        "$component_ref": "blog-idea-generator-agent-subflow"
+        "$component_ref": "blog-draft-writer-agent-subflow"
       },
       "metadata": {
         "cinatra": {
-          "packageName": "@cinatra-ai/blog-idea-generator-agent",
-          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-idea-generator-agent."
+          "packageName": "@cinatra-ai/blog-draft-writer-agent",
+          "description": "Child generation FlowNode to @cinatra-ai/blog-draft-writer-agent, at the one input its own repository now takes: the chosen idea as plain text. It answers with the post's title, its excerpt and its markdown, which the step after this one writes as the run's own blog-post artifact."
         }
       }
     },
@@ -2098,7 +1207,11 @@
       "inputs": [
         {
           "title": "idea",
-          "type": "object"
+          "type": "string",
+          "json_schema": {
+            "x-multiline": true,
+            "x-placeholder": "Paste one idea, or type what this post should be about"
+          }
         },
         {
           "title": "tone",
@@ -2158,8 +1271,25 @@
       ],
       "outputs": [
         {
-          "title": "draft",
-          "type": "object"
+          "title": "title",
+          "type": "string"
+        },
+        {
+          "title": "excerpt",
+          "type": "string"
+        },
+        {
+          "title": "content",
+          "type": "string"
+        },
+        {
+          "title": "sourcesUsed",
+          "type": "array",
+          "json_schema": {
+            "items": {
+              "type": "string"
+            }
+          }
         },
         {
           "title": "notes",
@@ -2302,15 +1432,51 @@
         },
         {
           "component_type": "DataFlowEdge",
-          "name": "blog-draft-writer-agent__write_draft_to_end_draft",
+          "name": "blog-draft-writer-agent__write_title_to_end_title",
           "source_node": {
             "$component_ref": "blog-draft-writer-agent__write"
           },
-          "source_output": "draft",
+          "source_output": "title",
           "destination_node": {
             "$component_ref": "blog-draft-writer-agent__end"
           },
-          "destination_input": "draft"
+          "destination_input": "title"
+        },
+        {
+          "component_type": "DataFlowEdge",
+          "name": "blog-draft-writer-agent__write_excerpt_to_end_excerpt",
+          "source_node": {
+            "$component_ref": "blog-draft-writer-agent__write"
+          },
+          "source_output": "excerpt",
+          "destination_node": {
+            "$component_ref": "blog-draft-writer-agent__end"
+          },
+          "destination_input": "excerpt"
+        },
+        {
+          "component_type": "DataFlowEdge",
+          "name": "blog-draft-writer-agent__write_content_to_end_content",
+          "source_node": {
+            "$component_ref": "blog-draft-writer-agent__write"
+          },
+          "source_output": "content",
+          "destination_node": {
+            "$component_ref": "blog-draft-writer-agent__end"
+          },
+          "destination_input": "content"
+        },
+        {
+          "component_type": "DataFlowEdge",
+          "name": "blog-draft-writer-agent__write_sourcesUsed_to_end_sourcesUsed",
+          "source_node": {
+            "$component_ref": "blog-draft-writer-agent__write"
+          },
+          "source_output": "sourcesUsed",
+          "destination_node": {
+            "$component_ref": "blog-draft-writer-agent__end"
+          },
+          "destination_input": "sourcesUsed"
         },
         {
           "component_type": "DataFlowEdge",
@@ -2424,7 +1590,11 @@
           "inputs": [
             {
               "title": "idea",
-              "type": "object"
+              "type": "string",
+              "json_schema": {
+                "x-multiline": true,
+                "x-placeholder": "Paste one idea, or type what this post should be about"
+              }
             },
             {
               "title": "tone",
@@ -2491,7 +1661,8 @@
           "http_method": "POST",
           "data": {
             "agent_id": "blog-draft-writer-agent",
-            "system": "You are a stateless blog draft writer agent. Follow the SKILL.md step-by-step. Do NOT call any MCP tool. Return a single JSON object with {draft: {title, excerpt, content, sourcesUsed?}, notes} \u2014 nothing else, no Markdown wrapping.",
+            "toolbox_ids": [],
+            "system": "You are a stateless blog draft writer agent. No toolbox joins this turn: Do NOT call any MCP tool. Follow the instructions below step-by-step. You fill five declared output fields \u2014 `title`, `excerpt`, `content`, `sourcesUsed`, `notes`. The runtime supplies and enforces the object that carries them, so never describe, quote, or serialise that object into any field: put ONLY each field's own value in it.\n\n# Blog Draft Writer Agent\n\nYou are a stateless blog-draft-writer agent. Take the inputs (`idea`, `tone`, `length`, `referenceContent`, `audience`, `voice`, `sources`), run the 5 steps below, and fill the five declared output fields. Never throw.\n\n## Inputs\n\n- `idea: string` (required): the whole idea, as ONE piece of plain text. There are no sub-fields and there is no JSON. An idea from `@cinatra-ai/blog-idea-generator-agent` opens with a `Title: ` line carrying its title, then a 1-3 sentence summary, then an `Outline:` line followed by 3-7 points, one per line. A person may instead type the idea freehand, as one sentence with no marker at all. Read whatever arrives; never expect fields.\n- `tone: string` (default `\"informative\"`) \u2014 `informative` / `casual` / `technical` / `executive` / or a free-form descriptor.\n- `length: string` (default `\"medium\"`) \u2014 `short` \u2248 400 words / `medium` \u2248 800 / `long` \u2248 1500 / or a free-form `\"<N> words\"` pattern (e.g., `\"1200 words\"`).\n- `referenceContent: string` (default `\"\"`) \u2014 transcript, research notes, or archive article body to draw from. Treat as **background source material only**: extract relevant thoughts and restate them generically. **Do not mention** the original transcript, its speakers, or outside companies/people. Do not reuse names of persons or companies from `referenceContent`.\n- `audience: string` (default `\"\"`) \u2014 target reader (e.g., `\"B2B SaaS founders evaluating enterprise sales\"`).\n- `voice: string` (default `\"\"`) \u2014 brand voice instructions or example sentences. When examples are provided, mirror their cadence, vocabulary, and phrasing.\n- `sources: array<{title, url}>` (default `[]`) \u2014 citations you may optionally cite inline.\n\nAll content you need to draft is provided via `idea`, `referenceContent`, and `sources`. If essential information is missing, document it in `notes` and write the best draft you can from what you have.\n\n## Step-by-step recipe\n\n### Step 1 \u2014 Parse inputs\n\n- Read `idea` as plain text, plus the optional fields (`tone`, `length`, `referenceContent`, `audience`, `voice`, `sources`).\n- Read the idea's own title: when its first line opens with `Title: `, the text after that marker IS the working title. When there is no such line, derive a working title from the idea's opening sentence and record that in `notes`. NEVER return a draft whose `title` is an empty string.\n- Read the idea's summary: the text between the title line and an `Outline:` line, when there is one. When the idea carries no summary, **derive** a 1-3 sentence summary from the idea text BEFORE proceeding, and record that in `notes`.\n- Read the idea's outline: the lines that follow an `Outline:` line, one point per line. When the idea carries no outline, **derive** a 3-5 point outline from the summary (or from the whole idea text when there is no summary either) BEFORE proceeding, and record that in `notes` so the caller knows the outline was synthesised.\n- Never expect JSON, key/value fields or sub-fields inside `idea`, and never treat its markers as data to be echoed back: they shape the reading, not the draft.\n- If `idea` is blank or carries no words at all, jump to the **Error handling** section's degenerate-input branch.\n\n### Step 2 \u2014 Plan the post arc\n\n- Map each `outline` point to one `<h2>` (`## `) section in the draft.\n- **Do not** add separate \"intro\" and \"conclusion\" h2 sections beyond the outline. Prefer **integrating** intro and wrap into the existing outline points (so an outline of `[\"intro\", \"use cases\", \"tradeoffs\", \"wrap\"]` produces 4 h2 sections, not 6).\n- Determine the **target word count** from `length`:\n  - `\"short\"` \u2192 300-500 words (target 400).\n  - `\"medium\"` \u2192 600-1000 words (target 800).\n  - `\"long\"` \u2192 1200-1800 words (target 1500).\n  - Free-form `\"<N> words\"` (e.g., `\"1200 words\"`) \u2192 parse `N` (integer); target \u00b110% of `N`.\n  - Unrecognised value \u2192 treat as `\"medium\"`.\n\n### Step 3 \u2014 Write the draft in markdown\n\nProduce `content` as a markdown string. Use the following conventions:\n\n- `title` = the idea's own title \u2014 the text behind its `Title: ` marker \u2014 tightened into a real headline when the idea arrived as one free-text sentence, or when the original needs adjustment (\u2264 80 chars, no clickbait, no all-caps).\n- `content` is **markdown only**. No HTML. No front-matter.\n- `content` holds the finished article body and NOTHING else. It is never a JSON object, never a serialised copy of the five fields, and never reproduces `title`, `excerpt`, `sourcesUsed` or `notes` as labelled values inside the body. It starts at the first `## ` heading.\n- **The blog post body must NOT repeat the title as an h1 heading or opening line.** Do not start `content` with `# <title>`. Start with the first outline section's `## ` heading and its body.\n- Use `## ` for each outline section.\n- Use `### ` for sub-points within a section when needed.\n- Plain paragraphs are the default. **Use numbered lists only when the content is naturally a sequence of ordered steps, priorities, or ranked points** (this rule is lifted from the original `packages/asset-blog/skills/generate-blog-post-draft/SKILL.md`).\n- Honor `tone` (informative / casual / technical / executive / or a free-form descriptor).\n- Honor `audience` \u2014 adapt vocabulary and assumed knowledge.\n- Honor `voice` \u2014 match brand sentences/phrasing when examples are provided.\n- When `referenceContent` is non-empty, use it as **background source material** \u2014 DO NOT mention the original transcript/document, its speakers, or outside companies/people. Restate the thoughts generically for the target audience. Match the tone, structure, and editorial style of any published blog posts implied by `voice` examples.\n- When you use a source from `sources[]` inline, write it as `[anchor text](url)` \u2014 both `title` and `url` from the source are available; pick the most natural anchor text.\n- No emoji unless `voice` explicitly asks.\n- Final word count must be within \u00b110% of the Step 2 target.\n\n### Step 4 \u2014 Write a 1-2 sentence excerpt\n\n- `excerpt` is a 1-2 sentence teaser, \u2264 200 chars total.\n- Should hook the reader on the central thesis.\n- Must **not** be a verbatim duplicate of the draft's first paragraph.\n\n### Step 5 \u2014 Populate sourcesUsed\n\n- List the **EXACT URLs from `sources[]` that you cited inline in `content`**. Deduplicate.\n- If you did not cite any source from `sources[]` inline, fill `sourcesUsed` with the empty list \u2014 the field is always filled, never omitted.\n- **Inline links that are NOT in `sources[]`** (e.g., URLs you happen to recall from memory) MUST NOT appear in `sourcesUsed[]`. The field is reserved for caller-provided sources \u2014 this is the provenance pin.\n\n## Length conventions\n\n| `length` value     | Word range  | Target |\n| ------------------ | ----------- | ------ |\n| `\"short\"`          | 300-500     | 400    |\n| `\"medium\"`         | 600-1000    | 800    |\n| `\"long\"`           | 1200-1800   | 1500   |\n| `\"<N> words\"`      | N \u00b110%      | N      |\n| anything else      | medium      | 800    |\n\n## Title and excerpt constraints\n\n- **Title:** \u2264 80 chars. No clickbait. No all-caps. No leading verbs that promise impossible outcomes (\"Crush\", \"Destroy\", etc.).\n- **Excerpt:** \u2264 200 chars. 1-2 sentences. Not a verbatim duplicate of the first paragraph.\n\n## Content formatting\n\n- Markdown only.\n- One `## ` per outline section (in outline order \u2014 section #N matches `outline[N]`).\n- `### ` for sub-points within a section if needed.\n- Plain paragraphs by default; numbered lists only for true ordered sequences.\n- No emoji unless `voice` asks.\n- No in-body h1 heading repeating the title.\n- No front-matter.\n\n## Outline honoring\n\n- **Every** outline point gets at least one `## ` section in `content`.\n- Section ordering in `content` matches `outline[]` ordering.\n- Intro and conclusion are integrated into the existing outline points (not added as separate sections).\n- If you derived the summary or the outline in Step 1, note this in `notes` (e.g., `\"summary and outline were synthesised from the idea text; 4 sections produced\"`).\n\n## Inline citations\n\n- Cite as `[anchor text](url)` using URLs from `sources[].url`.\n- Only cited URLs appear in `sourcesUsed`.\n- Pick anchor text from `sources[].title` or a natural noun phrase from the surrounding sentence.\n\n## Error handling\n\nNever throw. Always fill all five output fields.\n\n- **Malformed (non-text) input branch:** If `idea` arrives as anything other than text \u2014 a number, a boolean, an array or an object \u2014 set `title`, `excerpt` and `content` to the empty string, `sourcesUsed` to the empty list, and `notes` to exactly: `idea_was_not_text \u2014 the idea is one piece of plain text, not a structured value`.\n  This is distinct from the degenerate-input branch below so callers/operators can tell \"wrong shape\" apart from \"empty\" by reading `notes`.\n\n- **Degenerate input branch:** If `idea` is empty (null, undefined, or text carrying no words), set `title`, `excerpt` and `content` to the empty string, `sourcesUsed` to the empty list, and `notes` to exactly: `idea_was_empty_or_invalid \u2014 cannot draft`.\n  The OAS layer requires `idea` (StartNode `metadata.cinatra.required = [\"idea\"]`) and the setup form refuses an empty Idea before the run resumes, so this branch is defensive only. A well-formed dispatcher never reaches it, and a one-sentence idea NEVER reaches it.\n\n- **Missing optional fields:** Treat missing `tone` as `\"informative\"`, missing `length` as `\"medium\"`, missing `referenceContent` / `audience` / `voice` / `sources` as their declared defaults (`\"\"` / `\"\"` / `\"\"` / `[]`).\n\n- **Unparseable `length`:** Treat as `\"medium\"` and note the fallback in `notes` (e.g., `\"length value '8 paragraphs' not recognised; defaulted to medium (~800 words)\"`).\n\n## What each output field holds\n\nThe runtime supplies and enforces the object that carries these fields. Fill them; do not describe them, do not wrap them, and do not copy the object into any one of them.\n\n- `title` \u2014 the headline. \u2264 80 chars, refined from the idea's own title line when needed.\n- `excerpt` \u2014 the teaser. \u2264 200 chars, 1-2 sentences.\n- `content` \u2014 the finished markdown article body, and nothing else: no front-matter, no in-body h1 repeating the title, no JSON, no copy of the other fields. It starts at the first `## ` heading.\n- `sourcesUsed` \u2014 the caller-provided URLs cited inline, or the empty list.\n- `notes` \u2014 1-3 sentences for the operator: what was written, and any caveats (for example, 'the outline was synthesised from the idea text; word count 812 of 800 target').\n\n`sourcesUsed` is always filled \u2014 use the empty list when no inline citations from `sources[]` were used. The caller (host run-completion materializer) persists `content` as the polished draft's blog-post-artifact, titled from `title`.\n\n## Drafting rules\n\nApply these prompt patterns:\n\n- **Tone match:** Match the tone, structure, and editorial style of published blog posts on the company's website (when `voice` carries examples). When `voice` is empty, infer from `audience` and `tone`.\n- **Reference content discipline:** Use any attached `referenceContent` only as background source material. Do not mention the original transcript, its speakers, or outside companies/people. Do not reuse names of persons or companies from the transcript.\n- **Field discipline:** `excerpt` is a concise teaser; `content` is the full markdown draft. Both are required, and neither ever contains the other or a serialised copy of the five fields.\n- **Numbered lists:** When the content includes a sequence of ordered steps, priorities, or ranked points, format that sequence as a proper markdown numbered list.\n- **No title repetition:** The blog post body must not repeat the blog post title as a heading or opening line.",
             "user": "Write a blog draft from the following inputs.\nInputs:\n- idea: {{ idea }}\n- tone: {{ tone }}\n- length: {{ length }}\n- referenceContent: {{ referenceContent }}\n- audience: {{ audience }}\n- voice: {{ voice }}\n- sources: {{ sources }}\n- contextSlotBindings: {{ contextSlotBindings }}",
             "agent_run_id": "{{ agent_run_id }}",
             "cinatra_llm": {
@@ -2502,7 +1673,7 @@
           "inputs": [
             {
               "title": "idea",
-              "type": "object"
+              "type": "string"
             },
             {
               "title": "tone",
@@ -2569,12 +1740,34 @@
           ],
           "outputs": [
             {
-              "title": "draft",
-              "type": "object"
+              "title": "title",
+              "type": "string",
+              "description": "The blog post headline. At most 80 characters. Not a JSON object and not a copy of any other field."
+            },
+            {
+              "title": "excerpt",
+              "type": "string",
+              "description": "A 1-2 sentence teaser, at most 200 characters. Not a JSON object and not a copy of any other field."
+            },
+            {
+              "title": "content",
+              "type": "string",
+              "description": "The finished markdown article body ONLY, starting at its first `## ` heading. Never a JSON object, never a serialised copy of the output fields, and never a labelled reproduction of title, excerpt, sourcesUsed or notes inside the body."
+            },
+            {
+              "title": "sourcesUsed",
+              "type": "array",
+              "json_schema": {
+                "items": {
+                  "type": "string"
+                }
+              },
+              "description": "The caller-provided URLs that were cited inline in content; the empty list when none were."
             },
             {
               "title": "notes",
-              "type": "string"
+              "type": "string",
+              "description": "1-3 sentences for the operator about what was written and any caveats. Not a JSON object."
             }
           ],
           "metadata": {
@@ -2582,7 +1775,7 @@
               "riskClass": "read_only",
               "requiresApproval": false,
               "packageName": "@cinatra-ai/blog-draft-writer-agent",
-              "description": "Single ApiNode \u2192 /api/llm-bridge. Bridge auto-discovers SKILL.md from agents/cinatra/blog-draft-writer-agent/skills/blog-draft-writer-agent/SKILL.md (via agent_id). metadata.cinatra.toolboxes is INTENTIONALLY OMITTED \u2014 codex-locked decision #5: this leaf does not call web_search; caller chains @cinatra-ai/web-research-agent upstream if research is needed. SKILL.md forbids all MCP tool calls \u2014 this is a pure LLM-only generation leaf."
+              "description": "Single ApiNode \u2192 /api/llm-bridge. The agent's operating instructions are inline in data.system (no embedded skill bundle). Single bridge invocation; no toolbox is declared, so platform default-toolbox injection applies. Caller chains @cinatra-ai/web-research-agent upstream if research is needed."
             }
           }
         },
@@ -2592,9 +1785,29 @@
           "name": "End",
           "outputs": [
             {
-              "title": "draft",
-              "type": "object",
-              "default": {}
+              "title": "title",
+              "type": "string",
+              "default": ""
+            },
+            {
+              "title": "excerpt",
+              "type": "string",
+              "default": ""
+            },
+            {
+              "title": "content",
+              "type": "string",
+              "default": ""
+            },
+            {
+              "title": "sourcesUsed",
+              "type": "array",
+              "json_schema": {
+                "items": {
+                  "type": "string"
+                }
+              },
+              "default": []
             },
             {
               "title": "notes",
@@ -3365,63 +2578,93 @@
         }
       }
     },
-    "draft_flow": {
-      "component_type": "FlowNode",
-      "id": "draft_flow",
-      "name": "Blog draft",
-      "subflow": {
-        "$component_ref": "blog-draft-writer-agent-subflow"
+    "write_draft": {
+      "component_type": "ApiNode",
+      "id": "write_draft",
+      "name": "Write the draft as this run's blog post",
+      "url": "{{CINATRA_BASE_URL}}/api/agents/passthrough",
+      "http_method": "POST",
+      "data": {
+        "tool": "artifact_materialize",
+        "input": {
+          "extension": "@cinatra-ai/blog-post-artifact",
+          "objectTypeId": "@cinatra-ai/blog-post-artifact:post",
+          "declaredMime": "text/markdown",
+          "title": "{{ title }}",
+          "content": "{{ content }}",
+          "node_id": "write_draft"
+        },
+        "agent_run_id": "{{ cinatra_run_id }}"
       },
-      "metadata": {
-        "cinatra": {
-          "packageName": "@cinatra-ai/blog-draft-writer-agent",
-          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-draft-writer-agent."
-        }
-      }
-    },
-    "blog-image-prompt-agent-subflow": {
-      "agentspec_version": "26.1.0",
-      "component_type": "Flow",
-      "id": "blog-image-prompt-agent-subflow",
-      "name": "Blog Image Prompt Agent",
       "inputs": [
         {
-          "title": "draft",
-          "type": "object"
-        },
-        {
-          "title": "count",
-          "type": "integer",
-          "default": 3
-        },
-        {
-          "title": "placements",
-          "type": "array",
-          "json_schema": {
-            "items": {
-              "type": "string"
-            }
-          },
-          "default": [
-            "cover",
-            "inline",
-            "social"
-          ]
-        },
-        {
-          "title": "style",
+          "title": "title",
           "type": "string",
           "default": ""
         },
         {
-          "title": "brandKeywords",
-          "type": "array",
-          "json_schema": {
-            "items": {
-              "type": "string"
-            }
-          },
-          "default": []
+          "title": "content",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "cinatra_run_id",
+          "type": "string",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "artifactId",
+          "type": "string"
+        },
+        {
+          "title": "representationRevisionId",
+          "type": "string"
+        }
+      ],
+      "metadata": {
+        "cinatra": {
+          "riskClass": "write",
+          "requiresApproval": false,
+          "packageName": "@cinatra-ai/blog-pipeline-agent",
+          "description": "The mid-run write of plan (C) section 6.1 step 3: the draft becomes a blog-post artifact while the run is still going, so the review that follows opens on an immutable revision of the real post instead of on loose text. The reference it returns is what the projection hands the review step and what the picture is filed against."
+        }
+      }
+    },
+    "image_flow": {
+      "component_type": "FlowNode",
+      "id": "image_flow",
+      "name": "Featured image",
+      "subflow": {
+        "$component_ref": "blog-image-generator-agent-subflow"
+      },
+      "metadata": {
+        "cinatra": {
+          "packageName": "@cinatra-ai/blog-image-generator-agent",
+          "description": "Child FlowNode to @cinatra-ai/blog-image-generator-agent, the image maker the retired prompt writer became. It runs on the post the run just wrote and before the review, so the review sees the post with its featured image. The picture's own bytes are filed by the host's image tool, which is not built yet; until it is, this step settles the featured image's record and files nothing, and the review's target set names the post alone."
+        }
+      }
+    },
+    "blog-image-generator-agent-subflow": {
+      "agentspec_version": "26.1.0",
+      "component_type": "Flow",
+      "id": "blog-image-generator-agent-subflow",
+      "name": "Blog Image Generator Agent",
+      "inputs": [
+        {
+          "title": "post",
+          "type": "string"
+        },
+        {
+          "title": "placement",
+          "type": "string",
+          "default": "featured"
+        },
+        {
+          "title": "postArtifactId",
+          "type": "string",
+          "default": ""
         },
         {
           "title": "cinatra_run_id",
@@ -3431,7 +2674,7 @@
         {
           "title": "imagePromptContextParentPackageName",
           "type": "string",
-          "default": "@cinatra-ai/blog-image-prompt-agent"
+          "default": "@cinatra-ai/blog-image-generator-agent"
         },
         {
           "title": "imagePromptContextSlotId",
@@ -3446,12 +2689,33 @@
       ],
       "outputs": [
         {
-          "title": "prompts",
-          "type": "array",
+          "title": "image",
+          "type": "object",
           "json_schema": {
-            "items": {
-              "type": "object"
-            }
+            "type": "object",
+            "properties": {
+              "placement": {
+                "type": "string",
+                "enum": [
+                  "featured"
+                ]
+              },
+              "post": {
+                "type": "string"
+              },
+              "prompt": {
+                "type": "string"
+              },
+              "altText": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "placement",
+              "post",
+              "prompt",
+              "altText"
+            ]
           }
         },
         {
@@ -3460,227 +2724,201 @@
         }
       ],
       "start_node": {
-        "$component_ref": "blog-image-prompt-agent__start"
+        "$component_ref": "blog-image-generator-agent__start"
       },
       "nodes": [
         {
-          "$component_ref": "blog-image-prompt-agent__start"
+          "$component_ref": "blog-image-generator-agent__start"
         },
         {
-          "$component_ref": "blog-image-prompt-agent__context_imagePromptContext"
+          "$component_ref": "blog-image-generator-agent__context_imagePromptContext"
         },
         {
-          "$component_ref": "blog-image-prompt-agent__generate"
+          "$component_ref": "blog-image-generator-agent__generate"
         },
         {
-          "$component_ref": "blog-image-prompt-agent__end"
+          "$component_ref": "blog-image-generator-agent__end"
         }
       ],
       "control_flow_connections": [
         {
           "component_type": "ControlFlowEdge",
-          "name": "blog-image-prompt-agent__start_to_generate",
+          "name": "blog-image-generator-agent__start_to_generate",
           "from_node": {
-            "$component_ref": "blog-image-prompt-agent__start"
+            "$component_ref": "blog-image-generator-agent__start"
           },
           "to_node": {
-            "$component_ref": "blog-image-prompt-agent__context_imagePromptContext"
+            "$component_ref": "blog-image-generator-agent__context_imagePromptContext"
           }
         },
         {
           "component_type": "ControlFlowEdge",
-          "name": "blog-image-prompt-agent__generate_to_end",
+          "name": "blog-image-generator-agent__generate_to_end",
           "from_node": {
-            "$component_ref": "blog-image-prompt-agent__generate"
+            "$component_ref": "blog-image-generator-agent__generate"
           },
           "to_node": {
-            "$component_ref": "blog-image-prompt-agent__end"
+            "$component_ref": "blog-image-generator-agent__end"
           }
         },
         {
           "component_type": "ControlFlowEdge",
-          "name": "blog-image-prompt-agent__context_imagePromptContext_to_generate",
+          "name": "blog-image-generator-agent__context_imagePromptContext_to_generate",
           "from_node": {
-            "$component_ref": "blog-image-prompt-agent__context_imagePromptContext"
+            "$component_ref": "blog-image-generator-agent__context_imagePromptContext"
           },
           "to_node": {
-            "$component_ref": "blog-image-prompt-agent__generate"
+            "$component_ref": "blog-image-generator-agent__generate"
           }
         }
       ],
       "data_flow_connections": [
         {
           "component_type": "DataFlowEdge",
-          "name": "blog-image-prompt-agent__start_draft_to_generate_draft",
+          "name": "blog-image-generator-agent__start_post_to_generate_post",
           "source_node": {
-            "$component_ref": "blog-image-prompt-agent__start"
+            "$component_ref": "blog-image-generator-agent__start"
           },
-          "source_output": "draft",
+          "source_output": "post",
           "destination_node": {
-            "$component_ref": "blog-image-prompt-agent__generate"
+            "$component_ref": "blog-image-generator-agent__generate"
           },
-          "destination_input": "draft"
+          "destination_input": "post"
         },
         {
           "component_type": "DataFlowEdge",
-          "name": "blog-image-prompt-agent__start_count_to_generate_count",
+          "name": "blog-image-generator-agent__start_placement_to_generate_placement",
           "source_node": {
-            "$component_ref": "blog-image-prompt-agent__start"
+            "$component_ref": "blog-image-generator-agent__start"
           },
-          "source_output": "count",
+          "source_output": "placement",
           "destination_node": {
-            "$component_ref": "blog-image-prompt-agent__generate"
+            "$component_ref": "blog-image-generator-agent__generate"
           },
-          "destination_input": "count"
+          "destination_input": "placement"
         },
         {
           "component_type": "DataFlowEdge",
-          "name": "blog-image-prompt-agent__start_placements_to_generate_placements",
+          "name": "blog-image-generator-agent__start_postArtifactId_to_generate_postArtifactId",
           "source_node": {
-            "$component_ref": "blog-image-prompt-agent__start"
+            "$component_ref": "blog-image-generator-agent__start"
           },
-          "source_output": "placements",
+          "source_output": "postArtifactId",
           "destination_node": {
-            "$component_ref": "blog-image-prompt-agent__generate"
+            "$component_ref": "blog-image-generator-agent__generate"
           },
-          "destination_input": "placements"
+          "destination_input": "postArtifactId"
         },
         {
           "component_type": "DataFlowEdge",
-          "name": "blog-image-prompt-agent__start_style_to_generate_style",
+          "name": "blog-image-generator-agent__generate_image_to_end_image",
           "source_node": {
-            "$component_ref": "blog-image-prompt-agent__start"
+            "$component_ref": "blog-image-generator-agent__generate"
           },
-          "source_output": "style",
+          "source_output": "image",
           "destination_node": {
-            "$component_ref": "blog-image-prompt-agent__generate"
+            "$component_ref": "blog-image-generator-agent__end"
           },
-          "destination_input": "style"
+          "destination_input": "image"
         },
         {
           "component_type": "DataFlowEdge",
-          "name": "blog-image-prompt-agent__start_brandKeywords_to_generate_brandKeywords",
+          "name": "blog-image-generator-agent__generate_notes_to_end_notes",
           "source_node": {
-            "$component_ref": "blog-image-prompt-agent__start"
-          },
-          "source_output": "brandKeywords",
-          "destination_node": {
-            "$component_ref": "blog-image-prompt-agent__generate"
-          },
-          "destination_input": "brandKeywords"
-        },
-        {
-          "component_type": "DataFlowEdge",
-          "name": "blog-image-prompt-agent__generate_prompts_to_end_prompts",
-          "source_node": {
-            "$component_ref": "blog-image-prompt-agent__generate"
-          },
-          "source_output": "prompts",
-          "destination_node": {
-            "$component_ref": "blog-image-prompt-agent__end"
-          },
-          "destination_input": "prompts"
-        },
-        {
-          "component_type": "DataFlowEdge",
-          "name": "blog-image-prompt-agent__generate_notes_to_end_notes",
-          "source_node": {
-            "$component_ref": "blog-image-prompt-agent__generate"
+            "$component_ref": "blog-image-generator-agent__generate"
           },
           "source_output": "notes",
           "destination_node": {
-            "$component_ref": "blog-image-prompt-agent__end"
+            "$component_ref": "blog-image-generator-agent__end"
           },
           "destination_input": "notes"
         },
         {
           "component_type": "DataFlowEdge",
-          "name": "blog-image-prompt-agent__start_cinatra_run_id_to_generate_agent_run_id",
+          "name": "blog-image-generator-agent__start_cinatra_run_id_to_generate_agent_run_id",
           "source_node": {
-            "$component_ref": "blog-image-prompt-agent__start"
+            "$component_ref": "blog-image-generator-agent__start"
           },
           "source_output": "cinatra_run_id",
           "destination_node": {
-            "$component_ref": "blog-image-prompt-agent__generate"
+            "$component_ref": "blog-image-generator-agent__generate"
           },
           "destination_input": "agent_run_id"
         },
         {
           "component_type": "DataFlowEdge",
-          "name": "blog-image-prompt-agent__start_cinatra_run_id_to_context_imagePromptContext_parentRunId",
+          "name": "blog-image-generator-agent__start_cinatra_run_id_to_context_imagePromptContext_parentRunId",
           "source_node": {
-            "$component_ref": "blog-image-prompt-agent__start"
+            "$component_ref": "blog-image-generator-agent__start"
           },
           "source_output": "cinatra_run_id",
           "destination_node": {
-            "$component_ref": "blog-image-prompt-agent__context_imagePromptContext"
+            "$component_ref": "blog-image-generator-agent__context_imagePromptContext"
           },
           "destination_input": "parentRunId"
         },
         {
           "component_type": "DataFlowEdge",
-          "name": "blog-image-prompt-agent__start_imagePromptContextParentPackageName_to_context_imagePromptContext_parentPackageName",
+          "name": "blog-image-generator-agent__start_imagePromptContextParentPackageName_to_context_imagePromptContext_parentPackageName",
           "source_node": {
-            "$component_ref": "blog-image-prompt-agent__start"
+            "$component_ref": "blog-image-generator-agent__start"
           },
           "source_output": "imagePromptContextParentPackageName",
           "destination_node": {
-            "$component_ref": "blog-image-prompt-agent__context_imagePromptContext"
+            "$component_ref": "blog-image-generator-agent__context_imagePromptContext"
           },
           "destination_input": "parentPackageName"
         },
         {
           "component_type": "DataFlowEdge",
-          "name": "blog-image-prompt-agent__start_imagePromptContextSlotId_to_context_imagePromptContext_slotId",
+          "name": "blog-image-generator-agent__start_imagePromptContextSlotId_to_context_imagePromptContext_slotId",
           "source_node": {
-            "$component_ref": "blog-image-prompt-agent__start"
+            "$component_ref": "blog-image-generator-agent__start"
           },
           "source_output": "imagePromptContextSlotId",
           "destination_node": {
-            "$component_ref": "blog-image-prompt-agent__context_imagePromptContext"
+            "$component_ref": "blog-image-generator-agent__context_imagePromptContext"
           },
           "destination_input": "slotId"
         },
         {
           "component_type": "DataFlowEdge",
-          "name": "blog-image-prompt-agent__start_projectId_to_context_imagePromptContext_projectId",
+          "name": "blog-image-generator-agent__start_projectId_to_context_imagePromptContext_projectId",
           "source_node": {
-            "$component_ref": "blog-image-prompt-agent__start"
+            "$component_ref": "blog-image-generator-agent__start"
           },
           "source_output": "projectId",
           "destination_node": {
-            "$component_ref": "blog-image-prompt-agent__context_imagePromptContext"
+            "$component_ref": "blog-image-generator-agent__context_imagePromptContext"
           },
           "destination_input": "projectId"
         },
         {
           "component_type": "DataFlowEdge",
-          "name": "blog-image-prompt-agent__context_imagePromptContext_contextSlotBindings_to_generate",
+          "name": "blog-image-generator-agent__context_imagePromptContext_contextSlotBindings_to_generate",
           "source_node": {
-            "$component_ref": "blog-image-prompt-agent__context_imagePromptContext"
+            "$component_ref": "blog-image-generator-agent__context_imagePromptContext"
           },
           "source_output": "contextSlotBindings",
           "destination_node": {
-            "$component_ref": "blog-image-prompt-agent__generate"
+            "$component_ref": "blog-image-generator-agent__generate"
           },
           "destination_input": "contextSlotBindings"
         }
       ],
       "$referenced_components": {
-        "blog-image-prompt-agent__start": {
+        "blog-image-generator-agent__start": {
           "component_type": "StartNode",
-          "id": "blog-image-prompt-agent__start",
+          "id": "blog-image-generator-agent__start",
           "name": "Inputs",
           "metadata": {
             "cinatra": {
               "required": [
-                "draft"
+                "post"
               ],
               "hidden": [
-                "count",
-                "placements",
-                "style",
-                "brandKeywords",
+                "placement",
+                "postArtifactId",
                 "cinatra_run_id",
                 "imagePromptContextParentPackageName",
                 "imagePromptContextSlotId",
@@ -3690,42 +2928,18 @@
           },
           "inputs": [
             {
-              "title": "draft",
-              "type": "object"
+              "title": "post",
+              "type": "string"
             },
             {
-              "title": "count",
-              "type": "integer",
-              "default": 3
+              "title": "placement",
+              "type": "string",
+              "default": "featured"
             },
             {
-              "title": "placements",
-              "type": "array",
-              "json_schema": {
-                "items": {
-                  "type": "string"
-                }
-              },
-              "default": [
-                "cover",
-                "inline",
-                "social"
-              ]
-            },
-            {
-              "title": "style",
+              "title": "postArtifactId",
               "type": "string",
               "default": ""
-            },
-            {
-              "title": "brandKeywords",
-              "type": "array",
-              "json_schema": {
-                "items": {
-                  "type": "string"
-                }
-              },
-              "default": []
             },
             {
               "title": "cinatra_run_id",
@@ -3735,7 +2949,7 @@
             {
               "title": "imagePromptContextParentPackageName",
               "type": "string",
-              "default": "@cinatra-ai/blog-image-prompt-agent"
+              "default": "@cinatra-ai/blog-image-generator-agent"
             },
             {
               "title": "imagePromptContextSlotId",
@@ -3749,16 +2963,17 @@
             }
           ]
         },
-        "blog-image-prompt-agent__generate": {
+        "blog-image-generator-agent__generate": {
           "component_type": "ApiNode",
-          "id": "blog-image-prompt-agent__generate",
-          "name": "Generate image prompts via /api/llm-bridge",
+          "id": "blog-image-generator-agent__generate",
+          "name": "Settle the featured image via /api/llm-bridge",
           "url": "{{CINATRA_BASE_URL}}/api/llm-bridge",
           "http_method": "POST",
           "data": {
-            "agent_id": "blog-image-prompt-agent",
-            "system": "You are a stateless blog image-prompt generator. Follow the SKILL.md step-by-step. Return a single JSON object with {prompts, notes} \u2014 nothing else.",
-            "user": "Generate {{ count }} blog-image prompts for the supplied draft.\n\nDraft (JSON): {{ draft }}\n\nDistribute the prompts across these placements (default: cover, inline, social): {{ placements }}\n\nVisual style guidance (may be empty): {{ style }}\n\nBrand keywords to weave in (may be empty array): {{ brandKeywords }}\n\nReturn ONLY the JSON object specified in SKILL.md \u2014 keys: prompts (array of {placement, prompt, rationale}), notes (string).\n- contextSlotBindings: {{ contextSlotBindings }}",
+            "agent_id": "blog-image-generator-agent",
+            "toolbox_ids": [],
+            "system": "You are a stateless blog image generator. No toolbox joins this turn: Do NOT call any MCP tool. Follow the instructions below step-by-step. Return a single JSON object with exactly these two top-level keys:\n- \"image\": ONE object with \"placement\", \"post\", \"prompt\" and \"altText\".\n- \"notes\": 1-2 sentences on the choice you made.\nNothing else; no markdown wrapping of the JSON; no prose preface.\n\n# Blog Image Generator Agent\n\nYou make exactly one picture for the post you are given: the FEATURED image. You never make a picture for the body of the post, and you never return a list of pictures. One post, one picture.\n\n## What you receive\n- post: the draft post, as plain text, before its review.\n- placement: always \"featured\". Echo it back unchanged.\n- postArtifactId: the post this picture belongs to. Echo it back unchanged as \"post\".\n- contextSlotBindings: the brand material selected for this run, if any.\n\n## How to write the prompt\nThe prompt is the instruction the picture is made from, not copy for the reader: it travels with the image record and is never written into the post. Write one prompt that reads the post\u2019s subject and the brand material references given for this run and describes a single editorial image for the top of the post \u2014 one clear subject, room for a headline, no text drawn inside the picture, no logos, no collage of scenes and no second panel. A second scene is a second picture, and there is only one.\n\n## What you return\n- image.placement: \"featured\", exactly.\n- image.post: the postArtifactId you were given, exactly.\n- image.prompt: the prompt above, as one paragraph of plain text.\n- image.altText: one sentence a reader who cannot see the picture would be given instead. Always supply it.\n- notes: 1-2 sentences. Never a plan, never a prompt, never a list of alternatives.",
+            "user": "Make the featured image for the post below.\n\nPost (plain text): {{ post }}\n\nPlacement (always featured): {{ placement }}\n\nThe post this picture belongs to: {{ postArtifactId }}\n\nReferences to the brand material selected for this run: {{ contextSlotBindings }}\n\nReturn ONLY the JSON object specified in the system instructions - keys: image (object with placement, post, prompt, altText), notes (string).",
             "agent_run_id": "{{ agent_run_id }}",
             "cinatra_llm": {
               "preferredProvider": "openai",
@@ -3767,34 +2982,16 @@
           },
           "inputs": [
             {
-              "title": "draft",
-              "type": "object"
-            },
-            {
-              "title": "count",
-              "type": "integer"
-            },
-            {
-              "title": "placements",
-              "type": "array",
-              "json_schema": {
-                "items": {
-                  "type": "string"
-                }
-              }
-            },
-            {
-              "title": "style",
+              "title": "post",
               "type": "string"
             },
             {
-              "title": "brandKeywords",
-              "type": "array",
-              "json_schema": {
-                "items": {
-                  "type": "string"
-                }
-              }
+              "title": "placement",
+              "type": "string"
+            },
+            {
+              "title": "postArtifactId",
+              "type": "string"
             },
             {
               "title": "agent_run_id",
@@ -3832,12 +3029,33 @@
           ],
           "outputs": [
             {
-              "title": "prompts",
-              "type": "array",
+              "title": "image",
+              "type": "object",
               "json_schema": {
-                "items": {
-                  "type": "object"
-                }
+                "type": "object",
+                "properties": {
+                  "placement": {
+                    "type": "string",
+                    "enum": [
+                      "featured"
+                    ]
+                  },
+                  "post": {
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "altText": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "placement",
+                  "post",
+                  "prompt",
+                  "altText"
+                ]
               }
             },
             {
@@ -3849,25 +3067,46 @@
             "cinatra": {
               "riskClass": "read_only",
               "requiresApproval": false,
-              "packageName": "@cinatra-ai/blog-image-prompt-agent",
-              "description": "Single ApiNode \u2192 /api/llm-bridge. Bridge auto-discovers SKILL.md from agents/cinatra/blog-image-prompt-agent/skills/blog-image-prompt-agent/SKILL.md (via agent_id). No toolboxes \u2014 the LLM generates image prompts from the supplied draft using its own world knowledge; no MCP primitive calls, no web_search needed."
+              "packageName": "@cinatra-ai/blog-image-generator-agent",
+              "description": "Single ApiNode bridge invocation that settles the featured image of the supplied draft post - its placement, the post it belongs to, the prompt it is made from and its alternative text. The picture bytes are made by the host image tool, which is not built yet. Empty toolbox list; strict JSON answer {image:{placement,post,prompt,altText}, notes}."
             }
           }
         },
-        "blog-image-prompt-agent__end": {
+        "blog-image-generator-agent__end": {
           "component_type": "EndNode",
-          "id": "blog-image-prompt-agent__end",
+          "id": "blog-image-generator-agent__end",
           "name": "End",
           "outputs": [
             {
-              "title": "prompts",
-              "type": "array",
+              "title": "image",
+              "type": "object",
               "json_schema": {
-                "items": {
-                  "type": "object"
-                }
+                "type": "object",
+                "properties": {
+                  "placement": {
+                    "type": "string",
+                    "enum": [
+                      "featured"
+                    ]
+                  },
+                  "post": {
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "altText": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "placement",
+                  "post",
+                  "prompt",
+                  "altText"
+                ]
               },
-              "default": []
+              "default": {}
             },
             {
               "title": "notes",
@@ -3876,10 +3115,10 @@
             }
           ]
         },
-        "blog-image-prompt-agent__context-imagePromptContext-subflow": {
+        "blog-image-generator-agent__context-imagePromptContext-subflow": {
           "agentspec_version": "26.1.0",
           "component_type": "Flow",
-          "id": "blog-image-prompt-agent__context-imagePromptContext-subflow",
+          "id": "blog-image-generator-agent__context-imagePromptContext-subflow",
           "name": "Context Agent (imagePromptContext)",
           "inputs": [
             {
@@ -4623,12 +3862,12 @@
             }
           }
         },
-        "blog-image-prompt-agent__context_imagePromptContext": {
+        "blog-image-generator-agent__context_imagePromptContext": {
           "component_type": "FlowNode",
-          "id": "blog-image-prompt-agent__context_imagePromptContext",
+          "id": "blog-image-generator-agent__context_imagePromptContext",
           "name": "Resolve imagePromptContext",
           "subflow": {
-            "$component_ref": "blog-image-prompt-agent__context-imagePromptContext-subflow"
+            "$component_ref": "blog-image-generator-agent__context-imagePromptContext-subflow"
           },
           "metadata": {
             "cinatra": {
@@ -4638,17 +3877,137 @@
         }
       }
     },
-    "image_flow": {
+    "complete_relation": {
+      "component_type": "ApiNode",
+      "id": "complete_relation",
+      "name": "Record this idea's draft and gather the review's targets",
+      "url": "{{CINATRA_BASE_URL}}/api/agents/passthrough",
+      "http_method": "POST",
+      "data": {
+        "tool": "blog_pipeline_ideas",
+        "input": {
+          "op": "complete",
+          "ideaType": "@cinatra-ai/blog-idea-artifact:blog-idea",
+          "ideaArtifactId": "{{ ideaArtifactId }}",
+          "draftArtifactId": "{{ draftArtifactId }}",
+          "reviewTargets": "[{\"artifactId\": \"{{ draftArtifactId }}\", \"representationRevisionId\": \"{{ draftRevisionId }}\"}]",
+          "cinatra_agent_run_id": "{{ cinatra_run_id }}"
+        },
+        "agent_run_id": "{{ cinatra_run_id }}",
+        "result_input_passthrough": true,
+        "result_id_field": "ok"
+      },
+      "inputs": [
+        {
+          "title": "ideaArtifactId",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "draftArtifactId",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "draftRevisionId",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "cinatra_run_id",
+          "type": "string",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "reviewTargets",
+          "type": "string",
+          "default": "[]"
+        },
+        {
+          "title": "ok",
+          "type": "boolean",
+          "default": false
+        }
+      ],
+      "metadata": {
+        "cinatra": {
+          "riskClass": "write",
+          "requiresApproval": false,
+          "packageName": "@cinatra-ai/blog-pipeline-agent",
+          "description": "Two sentences of plan (C) section 6.1 in one call. It completes the reservation into the relation row \u2014 this idea, this draft, keyed by run and idea so a retry completes the same row and never a second \u2014 and it is the projection step of section 8.4: the call echoes its own input back, so the immutable reference the mid-run write returned reaches the review step as the set the marker below names. The set names the post; a picture joins it when the host's image tool files one. The call answers with the completion own ok flag, so a completion that did not land is visible in the run rather than hidden behind the echo; the run does not branch on it here, and an uncompleted reservation lapses on its own."
+        }
+      }
+    },
+    "emit_draft_payload": {
+      "component_type": "OutputMessageNode",
+      "id": "emit_draft_payload",
+      "name": "Emit generated draft as agent message",
+      "inputs": [
+        {
+          "title": "content",
+          "type": "string",
+          "json_schema": {
+            "type": "string"
+          },
+          "default": ""
+        }
+      ],
+      "message": "{# pyagentspec-input-hint (do not remove): {{ content }} #}{\"draft\":{\"content\":{{ content | tojson }}}}"
+    },
+    "draft_review_gate": {
+      "component_type": "InputMessageNode",
+      "id": "draft_review_gate",
+      "name": "Review blog draft",
+      "metadata": {
+        "cinatra": {
+          "riskClass": "read_only",
+          "requiresApproval": true,
+          "a2uiSurfaceId": "blog-pipeline:draft-review",
+          "inputMessageSchema": {
+            "type": "object",
+            "properties": {
+              "reviewApproval": {
+                "type": "string",
+                "title": "Draft review note"
+              }
+            },
+            "required": [
+              "reviewApproval"
+            ]
+          },
+          "description": "The review of plan (C) section 6.1 step 4. The marker below names the input this gate carries the run's own target set in, so the review core pins exactly the revisions the run minted and opens one review per artifact while the run parks here. The decision is the lifecycle's, not this flow's: this flow owns the pause. The set names the post today and each picture as well once the host's image tool files one.",
+          "artifactReview": {
+            "targetsInput": "reviewTargets"
+          }
+        }
+      },
+      "outputs": [
+        {
+          "title": "reviewApproval",
+          "type": "string"
+        }
+      ],
+      "inputs": [
+        {
+          "title": "reviewTargets",
+          "type": "string",
+          "default": "[]"
+        }
+      ]
+    },
+    "linkedin_flow": {
       "component_type": "FlowNode",
-      "id": "image_flow",
-      "name": "Image prompts",
+      "id": "linkedin_flow",
+      "name": "LinkedIn post",
       "subflow": {
-        "$component_ref": "blog-image-prompt-agent-subflow"
+        "$component_ref": "blog-linkedin-writer-agent-subflow"
       },
       "metadata": {
         "cinatra": {
-          "packageName": "@cinatra-ai/blog-image-prompt-agent",
-          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-image-prompt-agent. The in-pipeline image-BYTES producer is the asset-blog blog_image_generate_* path (job 3 / generateBlogImage\u2026), whose materializer produces @cinatra-ai/blog-image-artifact via createSemanticArtifact + assertSemanticType({assertedBy:'agent'}). blog-image-prompt-agent stays TEXT-only (emits prompts, NO produces)."
+          "packageName": "@cinatra-ai/blog-linkedin-writer-agent",
+          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-linkedin-writer-agent."
         }
       }
     },
@@ -5052,214 +4411,45 @@
         }
       }
     },
-    "linkedin_flow": {
-      "component_type": "FlowNode",
-      "id": "linkedin_flow",
-      "name": "LinkedIn post",
-      "subflow": {
-        "$component_ref": "blog-linkedin-writer-agent-subflow"
-      },
-      "metadata": {
-        "cinatra": {
-          "packageName": "@cinatra-ai/blog-linkedin-writer-agent",
-          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-linkedin-writer-agent."
-        }
-      }
-    },
-    "emit_ideas_payload": {
-      "component_type": "OutputMessageNode",
-      "id": "emit_ideas_payload",
-      "name": "Emit offered ideas as agent message",
-      "inputs": [
-        {
-          "title": "ideas",
-          "type": "array",
-          "json_schema": {
-            "items": {
-              "type": "object"
-            }
-          }
-        }
-      ],
-      "message": "{# pyagentspec-input-hint (do not remove): {{ ideas }} #}{\"ideas\":{{ ideas | tojson }}}"
-    },
-    "idea_selection_gate": {
+    "linkedin_review_gate": {
       "component_type": "InputMessageNode",
-      "id": "idea_selection_gate",
-      "name": "Select blog idea",
+      "id": "linkedin_review_gate",
+      "name": "Approve the LinkedIn post",
       "metadata": {
         "cinatra": {
           "riskClass": "read_only",
           "requiresApproval": true,
-          "renderer": "@cinatra-ai/blog-pipeline-agent:idea-selection",
-          "a2uiSurfaceId": "blog-pipeline:idea-selection",
+          "a2uiSurfaceId": "blog-pipeline:linkedin-review",
           "inputMessageSchema": {
             "type": "object",
-            "x-renderer": "@cinatra-ai/blog-pipeline-agent:idea-selection",
             "properties": {
-              "selectedIdeaJson": {
+              "linkedinApproval": {
                 "type": "string",
-                "title": "Selected idea (JSON)"
+                "title": "The LinkedIn post"
               }
             },
             "required": [
-              "selectedIdeaJson"
+              "linkedinApproval"
             ]
           },
-          "description": "Human selects exactly one BlogIdea from idea_flow.ideas; emits the chosen idea as a JSON string (InputMessageNode emits one string output \u2014 wayflow-input-message-node-contract)."
+          "description": "The last pause of plan (C) section 6.1 step 5: the LinkedIn post the writer made from the revision the person continued with, held for that person to approve before the run ends and the post is filed as a LinkedIn post-draft. The publishing steps are their own agents and are not in this flow."
         }
-      },
-      "outputs": [
-        {
-          "title": "selectedIdeaJson",
-          "type": "string"
-        }
-      ]
-    },
-    "selected_idea": {
-      "component_type": "ApiNode",
-      "id": "selected_idea",
-      "name": "Resolve selected idea",
-      "url": "{{CINATRA_BASE_URL}}/api/agents/passthrough",
-      "http_method": "POST",
-      "data": {
-        "tool": "objects_save",
-        "input": {
-          "_shape": "blog_pipeline_selected_idea",
-          "selectedIdeaJson": "{{ selectedIdeaJson }}",
-          "ideas": "{{ ideas }}",
-          "cinatra_agent_run_id": "{{ cinatra_run_id }}"
-        },
-        "agent_run_id": "{{ cinatra_run_id }}",
-        "result_input_passthrough": true
       },
       "inputs": [
         {
-          "title": "selectedIdeaJson",
-          "type": "string"
+          "title": "linkedinPost",
+          "type": "string",
+          "default": ""
         },
         {
-          "title": "ideas",
-          "type": "array",
-          "json_schema": {
-            "items": {
-              "type": "object"
-            }
-          }
-        },
-        {
-          "title": "cinatra_run_id",
+          "title": "linkedinTitle",
           "type": "string",
           "default": ""
         }
       ],
       "outputs": [
         {
-          "title": "idea",
-          "type": "object"
-        }
-      ],
-      "metadata": {
-        "cinatra": {
-          "riskClass": "write",
-          "requiresApproval": false,
-          "packageName": "@cinatra-ai/blog-pipeline-agent",
-          "description": "Deterministic seam: parses idea_selection_gate.selectedIdeaJson (validated against idea_flow.ideas) into a typed BlogIdea object for blog-draft-writer-agent.idea. Mirrors the email-outreach context_setup string-gate\u2192passthrough\u2192typed-output bridge (_shape 'blog_pipeline_selected_idea'; passthrough route per-_shape shaper)."
-        }
-      }
-    },
-    "draft_projection": {
-      "component_type": "ApiNode",
-      "id": "draft_projection",
-      "name": "Project draft for LinkedIn",
-      "url": "{{CINATRA_BASE_URL}}/api/agents/passthrough",
-      "http_method": "POST",
-      "data": {
-        "tool": "objects_save",
-        "input": {
-          "_shape": "blog_pipeline_draft_projection",
-          "draft": "{{ draft }}",
-          "cinatra_agent_run_id": "{{ cinatra_run_id }}"
-        },
-        "agent_run_id": "{{ cinatra_run_id }}",
-        "result_input_passthrough": true
-      },
-      "inputs": [
-        {
-          "title": "draft",
-          "type": "object"
-        },
-        {
-          "title": "cinatra_run_id",
-          "type": "string",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "postTitle",
-          "type": "string"
-        },
-        {
-          "title": "postExcerpt",
-          "type": "string"
-        },
-        {
-          "title": "blogPostContent",
-          "type": "string"
-        }
-      ],
-      "metadata": {
-        "cinatra": {
-          "riskClass": "write",
-          "requiresApproval": false,
-          "packageName": "@cinatra-ai/blog-pipeline-agent",
-          "description": "Deterministic seam: projects blog-draft-writer-agent.draft (object {title,excerpt,content}) into the string fields blog-linkedin-writer-agent needs (postTitle/postExcerpt/blogPostContent). _shape 'blog_pipeline_draft_projection' via the passthrough route per-_shape shaper."
-        }
-      }
-    },
-    "emit_draft_payload": {
-      "component_type": "OutputMessageNode",
-      "id": "emit_draft_payload",
-      "name": "Emit generated draft as agent message",
-      "inputs": [
-        {
-          "title": "draft",
-          "type": "object",
-          "json_schema": {
-            "type": "object"
-          }
-        }
-      ],
-      "message": "{# pyagentspec-input-hint (do not remove): {{ draft }} #}{\"draft\":{{ draft | tojson }}}"
-    },
-    "draft_review_gate": {
-      "component_type": "InputMessageNode",
-      "id": "draft_review_gate",
-      "name": "Review blog draft",
-      "metadata": {
-        "cinatra": {
-          "riskClass": "read_only",
-          "requiresApproval": true,
-          "a2uiSurfaceId": "blog-pipeline:draft-review",
-          "inputMessageSchema": {
-            "type": "object",
-            "properties": {
-              "reviewApproval": {
-                "type": "string",
-                "title": "Draft review note"
-              }
-            },
-            "required": [
-              "reviewApproval"
-            ]
-          },
-          "description": "MID-RUN HOLD, no reviewer of its own (cinatra#2047 / cinatra#1796). This flow declares the PAUSE; core's artifact-lifecycle interception owns the DECISION. The pipeline stops here, after the draft is generated and before draft_projection \u2192 image_flow \u2192 linkedin_flow derive anything from it, so the human can approve / request changes / reject on the run-embedded review gate core auto-opens for the produced draft artifact, then resume. Deliberately pins NO x-renderer: the decision surface is core's, and this node degrades to the host schema-field floor rather than re-binding a retired agent's renderer. Emits one string note (InputMessageNode emits one string output \u2014 wayflow-input-message-node-contract); the note is advisory only and is consumed by no downstream node. This is the runtime HITL pause where continuous-learning skill-autosave capture fires."
-        }
-      },
-      "outputs": [
-        {
-          "title": "reviewApproval",
+          "title": "linkedinApproval",
           "type": "string"
         }
       ]
@@ -5270,43 +4460,8 @@
       "name": "Pipeline outputs",
       "outputs": [
         {
-          "title": "ideas",
-          "type": "array",
-          "json_schema": {
-            "items": {
-              "type": "string"
-            }
-          },
-          "default": []
-        },
-        {
-          "title": "draft",
-          "type": "object",
-          "default": {},
-          "cinatra": {
-            "artifact": {
-              "extension": "@cinatra-ai/blog-post-artifact",
-              "objectTypeId": "@cinatra-ai/blog-post-artifact:post",
-              "contentFrom": "draftContent",
-              "declaredMime": "text/markdown",
-              "titleFrom": "draftTitle"
-            }
-          }
-        },
-        {
-          "title": "imagePrompts",
-          "type": "array",
-          "json_schema": {
-            "items": {
-              "type": "object"
-            }
-          },
-          "default": []
-        },
-        {
           "title": "linkedinPost",
           "type": "string",
-          "default": "",
           "cinatra": {
             "artifact": {
               "extension": "@cinatra-ai/linkedin-artifacts",
@@ -5315,20 +4470,11 @@
               "declaredMime": "text/plain",
               "titleFrom": "linkedinTitle"
             }
-          }
+          },
+          "default": ""
         },
         {
           "title": "linkedinTitle",
-          "type": "string",
-          "default": ""
-        },
-        {
-          "title": "draftTitle",
-          "type": "string",
-          "default": ""
-        },
-        {
-          "title": "draftContent",
           "type": "string",
           "default": ""
         }

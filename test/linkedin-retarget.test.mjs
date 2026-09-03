@@ -35,16 +35,29 @@ test("the LinkedIn binding reads a LinkedIn title, not the blog draft's", () => 
   );
 });
 
-test("the blog-post binding still reads the draft's own title", () => {
-  assert.equal(out("draft").cinatra.artifact.titleFrom, "draftTitle");
-  assert.equal(
-    out("draft").cinatra.artifact.objectTypeId,
-    "@cinatra-ai/blog-post-artifact:post",
+// The draft used to be bound at the end node, which meant it existed only once
+// the run was over — after the review that was supposed to read it. It is now
+// written while the run is going, and the end node binds it no more.
+test("the draft is not bound at the end node — it is written while the run runs", () => {
+  assert.equal(out("draft"), undefined);
+  const write = Object.values(oas.$referenced_components).find(
+    (n) => n && n.component_type === "ApiNode" && n.data && n.data.tool === "artifact_materialize",
   );
+  assert.ok(write, "the mid-run write is what keeps the blog-post production");
+  assert.equal(write.data.input.objectTypeId, "@cinatra-ai/blog-post-artifact:post");
+  assert.equal(write.data.input.declaredMime, "text/markdown");
 });
 
-test("the ideas the pipeline carries declare their member level as plain strings", () => {
-  assert.deepEqual(out("ideas").json_schema.items, { type: "string" });
+// The ideas the run offers are references a person picks from, not a bound
+// output, so what has to be declared is the reference each entry carries.
+test("the ideas the gate offers declare the reference a pick commits", () => {
+  const gate = oas.$referenced_components.idea_selection_gate;
+  const ideas = gate.inputs.find((i) => i.title === "ideas");
+  assert.deepEqual(ideas.json_schema.items, { type: "object" });
+  assert.match(
+    JSON.stringify(gate.metadata.cinatra.description),
+    /artifact and the exact revision/,
+  );
 });
 
 // The produces entries this run keeps today live in produces-it-can-keep.test.mjs:
