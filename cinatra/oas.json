@@ -1126,7 +1126,7 @@
           "op": "reserve",
           "ideaType": "@cinatra-ai/blog-idea-artifact:blog-idea",
           "pick": "{{ selectedIdeaJson }}",
-          "offered": "{{ ideas | tojson }}",
+          "offered": "{# pyagentspec-input-hint (do not remove): {{ ideas }} #}{{ ideas | tojson }}",
           "cinatra_agent_run_id": "{{ cinatra_run_id }}"
         },
         "agent_run_id": "{{ cinatra_run_id }}"

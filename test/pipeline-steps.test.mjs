@@ -339,8 +339,12 @@ test("the pick is validated against the very list the person was shown", () => {
     "string",
     "the request carries the offered list as one JSON-rendering template",
   );
+  // The template may carry the comment sentinel that keeps a filtered name
+  // visible to the runtime's input inference; it renders to nothing, so strip
+  // the comments before pinning what the step actually sends.
+  const rendered = offered.replace(/\{#[^#]*#\}/g, "");
   assert.match(
-    offered,
+    rendered,
     /^\{\{\s*ideas\s*\|\s*tojson\s*\}\}$/,
     "and it renders the node's own `ideas` input as JSON text, never a title list",
   );
