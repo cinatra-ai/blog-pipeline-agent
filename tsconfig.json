@@ -1,5 +1,5 @@
 {
-  "//": "Standalone strict TypeScript config for an extracted Cinatra extension repo. Extends nothing — the package no longer lives in the monorepo and must compile on its own. Targets the package's own src/.",
+  "//": "Standalone strict TypeScript config for an extracted Cinatra extension repo. Extends nothing — the package no longer lives in the monorepo and must compile on its own. Targets the package's own src/. Relative imports name the .ts file they resolve to, so one source runs unbuilt under the test runner and still emits .js specifiers into dist/.",
   "compilerOptions": {
     "target": "ES2023",
     "module": "ESNext",
@@ -19,7 +19,9 @@
     "outDir": "dist",
     "rootDir": "src",
     "noEmit": false,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", "dist"]
