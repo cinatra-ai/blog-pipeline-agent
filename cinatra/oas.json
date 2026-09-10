@@ -922,9 +922,14 @@
       "metadata": {
         "cinatra": {
           "required": [
-            "brief"
+            "brief",
+            "ideaCount"
           ],
           "hidden": [
+            "audience",
+            "tone",
+            "length",
+            "referenceContent",
             "companyUrl",
             "blogPostUrl",
             "projectId",
