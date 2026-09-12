@@ -998,11 +998,13 @@
       "url": "{{CINATRA_BASE_URL}}/api/agents/passthrough",
       "http_method": "POST",
       "data": {
-        "tool": "blog_pipeline_ideas",
+        "tool": "extension_tool",
         "input": {
-          "op": "prepare",
-          "ideaType": "@cinatra-ai/blog-idea-artifact:blog-idea",
-          "cinatra_agent_run_id": "{{ cinatra_run_id }}"
+          "name": "stored_ideas",
+          "input": {
+            "op": "prepare",
+            "ideaType": "@cinatra-ai/blog-idea-artifact:blog-idea"
+          }
         },
         "agent_run_id": "{{ cinatra_run_id }}"
       },
@@ -1126,13 +1128,15 @@
       "url": "{{CINATRA_BASE_URL}}/api/agents/passthrough",
       "http_method": "POST",
       "data": {
-        "tool": "blog_pipeline_ideas",
+        "tool": "extension_tool",
         "input": {
-          "op": "reserve",
-          "ideaType": "@cinatra-ai/blog-idea-artifact:blog-idea",
-          "pick": "{{ selectedIdeaJson }}",
-          "offered": "{# pyagentspec-input-hint (do not remove): {{ ideas }} #}{{ ideas | tojson }}",
-          "cinatra_agent_run_id": "{{ cinatra_run_id }}"
+          "name": "stored_ideas",
+          "input": {
+            "op": "reserve",
+            "ideaType": "@cinatra-ai/blog-idea-artifact:blog-idea",
+            "pick": "{{ selectedIdeaJson }}",
+            "offered": "{# pyagentspec-input-hint (do not remove): {{ ideas }} #}{{ ideas | tojson }}"
+          }
         },
         "agent_run_id": "{{ cinatra_run_id }}"
       },
@@ -3889,14 +3893,16 @@
       "url": "{{CINATRA_BASE_URL}}/api/agents/passthrough",
       "http_method": "POST",
       "data": {
-        "tool": "blog_pipeline_ideas",
+        "tool": "extension_tool",
         "input": {
-          "op": "complete",
-          "ideaType": "@cinatra-ai/blog-idea-artifact:blog-idea",
-          "ideaArtifactId": "{{ ideaArtifactId }}",
-          "draftArtifactId": "{{ draftArtifactId }}",
-          "reviewTargets": "[{\"artifactId\": \"{{ draftArtifactId }}\", \"representationRevisionId\": \"{{ draftRevisionId }}\"}]",
-          "cinatra_agent_run_id": "{{ cinatra_run_id }}"
+          "name": "stored_ideas",
+          "input": {
+            "op": "complete",
+            "ideaType": "@cinatra-ai/blog-idea-artifact:blog-idea",
+            "ideaArtifactId": "{{ ideaArtifactId }}",
+            "draftArtifactId": "{{ draftArtifactId }}",
+            "reviewTargets": "[{\"artifactId\": \"{{ draftArtifactId }}\", \"representationRevisionId\": \"{{ draftRevisionId }}\"}]"
+          }
         },
         "agent_run_id": "{{ cinatra_run_id }}",
         "result_input_passthrough": true,

@@ -428,6 +428,8 @@ describe("the relation the pack declares is the relation the gate names", () => 
         "idea_revision_id",
         "org_id",
         "run_id",
+        "scope_id",
+        "scope_kind",
         "state",
       ],
     );
@@ -516,5 +518,122 @@ describe("the calling extension names the artifact type its ideas are filed unde
         },
       );
     }
+  });
+});
+
+describe("prepare releases expired reservations before it selects the offer", () => {
+  // "A reservation whose run fails or expires is released ... and the idea
+  // returns to the list." Nothing released it: `takenArtifactIdsFromRows` reads
+  // the state alone and says a lapsed reservation is "already released by the
+  // runner's sweep", so an abandoned run held its idea for ever. The sweep is
+  // that sentence, run at the one moment it matters — before the offer is
+  // selected — and read against the CLOCK THE CALLER INJECTS, so a lapse is a
+  // test and not a wait.
+  const NOW = new Date("2026-09-12T12:00:00.000Z");
+  const LAPSED = "2026-09-10T00:00:00.000Z";
+  const STILL_HELD = "2026-09-14T00:00:00.000Z";
+
+  function sweepPorts(seed: Array<Record<string, unknown>>) {
+    const rows = seed.map((r) => ({ ...r }));
+    const calls: string[] = [];
+    const ports: StoredIdeasPorts = {
+      async listIdeaArtifacts() {
+        calls.push("list-artifacts");
+        return [
+          { artifactId: IDEA_A.artifactId, representationRevisionId: IDEA_A.representationRevisionId },
+          { artifactId: IDEA_B.artifactId, representationRevisionId: IDEA_B.representationRevisionId },
+        ];
+      },
+      async readIdeaText(artifactId) {
+        calls.push(`read:${artifactId}`);
+        return artifactId === IDEA_A.artifactId ? IDEA_A.text : IDEA_B.text;
+      },
+      async listRelationRows() {
+        calls.push("list-rows");
+        return rows.map((r) => ({ ...r }));
+      },
+      async insertRelationRow() {
+        calls.push("insert");
+        return { ok: true as const };
+      },
+      async updateRelationRow(keys, patch) {
+        calls.push(`update:${String(keys.idea_artifact_id)}:${keys.state ?? ""}`);
+        const row = rows.find(
+          (r) =>
+            r.run_id === keys.run_id &&
+            r.idea_artifact_id === keys.idea_artifact_id &&
+            (keys.state === undefined || r.state === keys.state),
+        );
+        if (!row) return { ok: false as const, conflict: false as const };
+        Object.assign(row, patch);
+        return { ok: true as const };
+      },
+    };
+    return { ports, calls, rows };
+  }
+
+  function reservedRow(expiresAt: string | null, state = "reserved") {
+    return {
+      org_id: "org-1",
+      run_id: "run-0",
+      idea_artifact_id: IDEA_A.artifactId,
+      idea_revision_id: IDEA_A.representationRevisionId,
+      state,
+      draft_artifact_id: null,
+      expires_at: expiresAt,
+      created_at: "2026-09-08T00:00:00.000Z",
+    };
+  }
+
+  it("releases a reservation whose expiry has passed and offers its idea again", async () => {
+    const { ports: p, calls, rows } = sweepPorts([reservedRow(LAPSED)]);
+    const out = await prepareStoredIdeas({ ports: p, orgId: "org-1", runId: "run-1", now: NOW });
+    assert.equal(out.ok, true);
+    if (!out.ok) return;
+    assert.deepEqual(out.ideas.map((i) => i.artifactId), ["idea-a", "idea-b"]);
+    // The row is RELEASED, and on the reserved state, so a relation is untouched.
+    matchesObject(rows[0], { state: "released", expires_at: null });
+    assert.ok(calls.includes(`update:${IDEA_A.artifactId}:reserved`));
+    // BEFORE the offer is selected: the release lands ahead of the reads the
+    // offer is built from, or the swept idea would be missing from this list.
+    assert.ok(
+      calls.indexOf(`update:${IDEA_A.artifactId}:reserved`) < calls.indexOf(`read:${IDEA_A.artifactId}`),
+      `the release runs before the offer is read (${calls.join(" -> ")})`,
+    );
+  });
+
+  it("reads the expiry against the injected clock, not the wall clock", async () => {
+    // The SAME row, before its expiry: still held, and no write at all.
+    const { ports: p, calls, rows } = sweepPorts([reservedRow(STILL_HELD)]);
+    const out = await prepareStoredIdeas({ ports: p, orgId: "org-1", runId: "run-1", now: NOW });
+    assert.equal(out.ok, true);
+    if (!out.ok) return;
+    assert.deepEqual(out.ideas.map((i) => i.artifactId), ["idea-b"]);
+    matchesObject(rows[0], { state: "reserved", expires_at: STILL_HELD });
+    assert.ok(!calls.some((c) => c.startsWith("update:")), "an unexpired reservation is not swept");
+  });
+
+  it("leaves a completed relation alone, and a reservation with no expiry at all", async () => {
+    const { ports: p, calls, rows } = sweepPorts([
+      { ...reservedRow(LAPSED, "drafted"), draft_artifact_id: "draft-1" },
+    ]);
+    const out = await prepareStoredIdeas({ ports: p, orgId: "org-1", runId: "run-1", now: NOW });
+    assert.equal(out.ok, true);
+    if (!out.ok) return;
+    assert.deepEqual(out.ideas.map((i) => i.artifactId), ["idea-b"], "a drafted idea stays used");
+    matchesObject(rows[0], { state: "drafted", draft_artifact_id: "draft-1" });
+    assert.ok(!calls.some((c) => c.startsWith("update:")), "a relation is never swept");
+
+    const open = sweepPorts([reservedRow(null)]);
+    const out2 = await prepareStoredIdeas({
+      ports: open.ports,
+      orgId: "org-1",
+      runId: "run-1",
+      now: NOW,
+    });
+    assert.equal(out2.ok, true);
+    if (!out2.ok) return;
+    assert.deepEqual(out2.ideas.map((i) => i.artifactId), ["idea-b"]);
+    matchesObject(open.rows[0], { state: "reserved", expires_at: null });
   });
 });
