@@ -60,6 +60,29 @@ const toolNodes = (tool, op) =>
     if (!node.data || node.data.tool !== tool) return false;
     return op === undefined || (node.data.input && node.data.input.op === op);
   });
+
+// The stored-ideas gate travels through the host's ONE generic dispatch: the
+// request names `extension_tool`, the dispatch resolves `name` against this
+// pack's own declared tools, and the module's own call lives one level in, under
+// `input.input`. The run's identity stays in the envelope's `agent_run_id` and
+// never reaches the module's input.
+const STORED_IDEAS_DISPATCH_TOOL = "extension_tool";
+const STORED_IDEAS_TOOL_NAME = "stored_ideas";
+/** The module's own input for a stored-ideas step, or null for any other node. */
+const storedIdeasInput = (node) => {
+  const data = node.data;
+  if (!data || data.tool !== STORED_IDEAS_DISPATCH_TOOL) return null;
+  const envelope = data.input;
+  if (!envelope || envelope.name !== STORED_IDEAS_TOOL_NAME) return null;
+  return envelope.input ?? {};
+};
+const storedIdeasNodes = (op) =>
+  ownNodes().filter((id) => {
+    const node = parts[id];
+    if (node.component_type !== "ApiNode") return false;
+    const input = storedIdeasInput(node);
+    return input !== null && (op === undefined || input.op === op);
+  });
 const edgeInto = (node, input) =>
   oas.data_flow_connections.find(
     (e) => e.destination_node.$component_ref === node && e.destination_input === input,
@@ -69,12 +92,56 @@ const edgeInto = (node, input) =>
 // 1. "A list of the organisation's blog ideas no draft has used." (6.1 step 2)
 // ---------------------------------------------------------------------------
 
+test("the three stored-ideas steps call the host's generic dispatch by the name this pack declares", () => {
+  // The tool of the host's own the three steps used to call is gone: what the
+  // host admits is ONE generic dispatch, and the name it runs is resolved against
+  // THIS pack's own declaration. So each step names `extension_tool`, asks for
+  // the declared name, and carries its own call one level in — and the run's
+  // identity stays in the envelope, never inside the module's input, which the
+  // dispatch refuses rather than quietly strips.
+  const declared = (manifest.cinatra.tools ?? []).map((t) => t.name);
+  assert.ok(
+    declared.includes(STORED_IDEAS_TOOL_NAME),
+    "the pack declares the name its own steps ask the dispatch for",
+  );
+  const expected = {
+    prepare: ["ideaType", "op"],
+    reserve: ["ideaType", "offered", "op", "pick"],
+    complete: ["draftArtifactId", "ideaArtifactId", "ideaType", "op", "reviewTargets"],
+  };
+  for (const [op, fields] of Object.entries(expected)) {
+    const found = storedIdeasNodes(op);
+    assert.equal(found.length, 1, `exactly one step runs the gate's "${op}"`);
+    const data = parts[found[0]].data;
+    assert.equal(data.tool, STORED_IDEAS_DISPATCH_TOOL, `"${op}" calls the generic dispatch`);
+    assert.equal(data.input.name, STORED_IDEAS_TOOL_NAME, `"${op}" asks for the declared name`);
+    assert.deepEqual(
+      Object.keys(data.input).sort(),
+      ["input", "name"],
+      `the "${op}" dispatch envelope carries the name and the module's own input, nothing else`,
+    );
+    const moduleInput = data.input.input;
+    assert.deepEqual(Object.keys(moduleInput).sort(), fields, `the "${op}" call's own input`);
+    for (const identity of ["agent_run_id", "cinatra_agent_run_id", "cinatra_run_id"]) {
+      assert.ok(
+        !(identity in moduleInput),
+        `the run's identity stays in the envelope — "${op}" must not carry ${identity} inward`,
+      );
+    }
+    assert.equal(
+      data.agent_run_id,
+      "{{ cinatra_run_id }}",
+      `the "${op}" step still binds the run in the passthrough envelope`,
+    );
+  }
+});
+
 test("a preparation step reads the organisation's stored ideas in front of the gate", () => {
-  const prepare = toolNodes("blog_pipeline_ideas", "prepare");
+  const prepare = storedIdeasNodes("prepare");
   assert.equal(prepare.length, 1, "exactly one preparation step lists the stored ideas");
   const node = parts[prepare[0]];
   assert.equal(
-    node.data.input.ideaType,
+    storedIdeasInput(node).ideaType,
     IDEA_TYPE,
     "the preparation step names the idea type the pipeline declares as a dependency",
   );
@@ -82,7 +149,7 @@ test("a preparation step reads the organisation's stored ideas in front of the g
 });
 
 test("the gate offers that list, not a free-text field and not an in-run batch", () => {
-  const prepare = toolNodes("blog_pipeline_ideas", "prepare")[0];
+  const prepare = storedIdeasNodes("prepare")[0];
   const gate = parts.idea_selection_gate;
   const declared = (gate.inputs ?? []).map((i) => i.title);
   assert.ok(declared.includes("ideas"), "the gate declares the offered ideas as a render input");
@@ -118,7 +185,7 @@ test("nothing saves a selected idea any more", () => {
 });
 
 test("the pick is reserved, and the reserved idea's own words are what the draft is written from", () => {
-  const reserve = toolNodes("blog_pipeline_ideas", "reserve");
+  const reserve = storedIdeasNodes("reserve");
   assert.equal(reserve.length, 1, "exactly one step takes the picked idea");
   const node = parts[reserve[0]];
   assert.ok(at("idea_selection_gate") < at(reserve[0]), "it runs after the pick");
@@ -159,13 +226,13 @@ test("the draft is written while the run is still going, as a blog-post artifact
 });
 
 test("the relation row says which idea this draft came from", () => {
-  const complete = toolNodes("blog_pipeline_ideas", "complete");
+  const complete = storedIdeasNodes("complete");
   assert.equal(complete.length, 1);
   const node = parts[complete[0]];
   const write = toolNodes("artifact_materialize")[0];
   assert.ok(at(write) < at(complete[0]));
   assert.equal(edgeInto(complete[0], "draftArtifactId").source_node.$component_ref, write);
-  assert.equal(edgeInto(complete[0], "ideaArtifactId").source_node.$component_ref, toolNodes("blog_pipeline_ideas", "reserve")[0]);
+  assert.equal(edgeInto(complete[0], "ideaArtifactId").source_node.$component_ref, storedIdeasNodes("reserve")[0]);
 });
 
 // ---------------------------------------------------------------------------
@@ -185,7 +252,7 @@ test("the review step carries the marker, and the marker names an input the run 
   const projection = parts[edge.source_node.$component_ref];
   assert.equal(projection.component_type, "ApiNode");
   assert.equal(projection.data.result_input_passthrough, true);
-  const targets = JSON.stringify(projection.data.input[named]);
+  const targets = JSON.stringify(storedIdeasInput(projection)[named]);
   assert.match(targets, /artifactId/);
   assert.match(targets, /representationRevisionId/);
 });
@@ -289,6 +356,8 @@ test("the pipeline declares the idea-to-draft relation table it writes", () => {
     "idea_revision_id",
     "org_id",
     "run_id",
+    "scope_id",
+    "scope_kind",
     "state",
   ]);
   const org = relation.columns.find((c) => c.name === "org_id");
@@ -322,7 +391,7 @@ test("a person offered nothing can still leave the gate, and the run ends with t
   const out = parts.idea_selection_gate.outputs.find((o) => o.title === "selectedIdeaJson");
   assert.equal(out.default, "", "an unanswered pick leaves the gate as an empty pick");
   // ...and the step that follows refuses it by name rather than drafting.
-  const reserve = toolNodes("blog_pipeline_ideas", "reserve")[0];
+  const reserve = storedIdeasNodes("reserve")[0];
   const reason = parts[reserve].outputs.find((o) => o.title === "reason");
   assert.ok(reason, "the refusal carries its own sentence");
   assert.equal(reason.default, "");
@@ -332,8 +401,8 @@ test("the pick is validated against the very list the person was shown", () => {
   // resolveIdeaPick matches the pick against `offered` and fails closed when the
   // list is empty or does not hold the pick. Feeding it a DIFFERENT list than
   // the gate drew would silently refuse every honest pick.
-  const reserve = toolNodes("blog_pipeline_ideas", "reserve")[0];
-  const offered = parts[reserve].data.input.offered;
+  const reserve = storedIdeasNodes("reserve")[0];
+  const offered = storedIdeasInput(parts[reserve]).offered;
   assert.equal(
     typeof offered,
     "string",
@@ -358,7 +427,7 @@ test("the completion answers with its own ok, so a relation that never landed is
   // The projection rides the call's input echo. The echo REPLACES the tool's own
   // result, so without this the run cannot tell a completed relation from a
   // failed one and reviews a draft whose idea was never marked used.
-  const complete = toolNodes("blog_pipeline_ideas", "complete")[0];
+  const complete = storedIdeasNodes("complete")[0];
   const data = parts[complete].data;
   assert.equal(data.result_input_passthrough, true);
   assert.equal(data.result_id_field, "ok", "the echo carries the call's own ok through");
@@ -373,7 +442,7 @@ test("the review's target set is the run's own reference, in the shape the revie
   const named = gate.metadata.cinatra.artifactReview.targetsInput;
   const edge = edgeInto("draft_review_gate", named);
   const projection = edge.source_node.$component_ref;
-  const template = parts[projection].data.input[named];
+  const template = storedIdeasInput(parts[projection])[named];
   assert.equal(typeof template, "string", "one JSON array string, which is what is parsed");
   // Render it the way the run does, then PARSE it — a regex over field names
   // would pass on a set that is not valid JSON at all.
@@ -447,7 +516,7 @@ test("the picture files nothing yet, and the review's set says so rather than pr
   const image = parts[parts.image_flow.subflow.$component_ref];
   const outputs = (image.outputs ?? []).map((o) => o.title).sort();
   assert.deepEqual(outputs, ["image", "notes"], "the picture answers with its record, not a reference");
-  const projection = toolNodes("blog_pipeline_ideas", "complete")[0];
+  const projection = storedIdeasNodes("complete")[0];
   const feeding = oas.data_flow_connections.filter(
     (e) => e.destination_node.$component_ref === projection,
   );

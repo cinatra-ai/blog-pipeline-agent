@@ -112,7 +112,11 @@ test("the reservation step still validates the pick against the list it was offe
   assert.equal(reserve.component_type, "ApiNode");
   const declared = reserve.inputs.map((i) => i.title);
   assert.ok(declared.includes("ideas"), "the offered list stays an input of the reservation");
-  const offered = reserve.data.input.offered;
+  // The reservation travels through the host's one generic dispatch, so the
+  // step's own call lives one level in, under the declared name it asks for.
+  assert.equal(reserve.data.tool, "extension_tool");
+  assert.equal(reserve.data.input.name, "stored_ideas");
+  const offered = reserve.data.input.input.offered;
   assert.match(offered, /\{\{\s*ideas\s*\|\s*tojson\s*\}\}/, "and the body sends that list on");
   assert.match(
     offered,

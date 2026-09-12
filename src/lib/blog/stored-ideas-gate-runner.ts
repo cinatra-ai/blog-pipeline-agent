@@ -27,6 +27,7 @@
 import {
   IDEA_RELATION_TABLE,
   IDEA_TAKEN_REASON,
+  RELEASED_RELATION_STATE,
   offerStoredIdeas,
   takenArtifactIdsFromRows,
   type OfferedIdea,
@@ -68,6 +69,66 @@ export interface StoredIdeasPorts {
 }
 
 /**
+ * The rows a sweep releases: a RESERVATION whose expiry has passed on the given
+ * clock, and nothing else. A relation (`drafted`) is not a reservation and never
+ * lapses; a reservation with no expiry is held until its run releases it; an
+ * unreadable expiry is left alone rather than guessed at.
+ */
+function expiredReservationRows(
+  rows: ReadonlyArray<Record<string, unknown>>,
+  now: Date,
+): Array<Record<string, unknown>> {
+  const at = now.getTime();
+  return rows.filter((row) => {
+    if (row.state !== "reserved") return false;
+    const raw = row.expires_at;
+    const expires =
+      raw instanceof Date
+        ? raw.getTime()
+        : typeof raw === "string"
+          ? Date.parse(raw)
+          : Number.NaN;
+    return Number.isFinite(expires) && expires <= at;
+  });
+}
+
+/**
+ * Release every lapsed reservation, and answer with the rows that still take
+ * their idea off the list.
+ *
+ * KEYED ON EACH ROW'S OWN RUN AND THE RESERVED STATE, read off the row rather
+ * than passed in: the sweep releases reservations of runs that are not this one
+ * — that is the whole point of it — and a row already completed into a relation
+ * is left standing, so a finished draft never hands its idea back to the list.
+ * A release the write refused leaves the idea taken for this offer: the row is
+ * still held as far as this run can tell, and the next preparation sweeps again.
+ */
+async function releaseExpiredReservations(input: {
+  readonly ports: StoredIdeasPorts;
+  readonly rows: ReadonlyArray<Record<string, unknown>>;
+  readonly now: Date;
+}): Promise<Array<Record<string, unknown>>> {
+  const expired = expiredReservationRows(input.rows, input.now);
+  if (expired.length === 0) return [...input.rows];
+  const released = new Set<Record<string, unknown>>();
+  for (const row of expired) {
+    const ideaArtifactId =
+      typeof row.idea_artifact_id === "string" ? row.idea_artifact_id : "";
+    if (ideaArtifactId === "") continue;
+    const written = await input.ports.updateRelationRow(
+      {
+        run_id: typeof row.run_id === "string" ? row.run_id : "",
+        idea_artifact_id: ideaArtifactId,
+        state: "reserved",
+      },
+      { state: RELEASED_RELATION_STATE, expires_at: null },
+    );
+    if (written.ok) released.add(row);
+  }
+  return input.rows.filter((row) => !released.has(row));
+}
+
+/**
  * The list the gate offers. A refusal here ends the run with the sentence it
  * carries — "an empty list ends the run with a plain reason".
  */
@@ -75,12 +136,27 @@ export async function prepareStoredIdeas(input: {
   readonly ports: StoredIdeasPorts;
   readonly orgId: string;
   readonly runId: string;
+  /** The clock a reservation's expiry is read against — injected, so a lapse is
+   *  a test and never a wait. */
+  readonly now?: Date;
 }): Promise<StoredIdeaOffer> {
   const [references, rows] = await Promise.all([
     input.ports.listIdeaArtifacts(),
     input.ports.listRelationRows(),
   ]);
-  const taken = new Set(takenArtifactIdsFromRows(rows));
+  // EXPIRED RESERVATIONS ARE RELEASED BEFORE THE OFFER IS SELECTED. "A
+  // reservation whose run fails or expires is released ... and the idea returns
+  // to the list" — and the sweep the decision module names ("a reservation with
+  // an expiry in the past is already released by the runner's sweep") is this
+  // one. It runs HERE, ahead of the subtraction and the reads, because a lapsed
+  // reservation swept after the list was drawn would hand its idea back to
+  // nobody: the offer this run makes is the list the sweep just widened.
+  const live = await releaseExpiredReservations({
+    ports: input.ports,
+    rows,
+    now: input.now ?? new Date(),
+  });
+  const taken = new Set(takenArtifactIdsFromRows(live));
   // ONE CONTENT READ PER UNUSED IDEA, and none for an idea already taken: the
   // subtraction happens before the reads, not after them, so a list of a hundred
   // ideas of which two are free costs two reads.
