@@ -3,9 +3,10 @@
 All notable changes to this project are documented here, derived from the
 project's merged pull request and release-tag history.
 
-## Unreleased
+## v0.2.1 — 2026-09-13
 
-- feat: the pipeline no longer composes a reviewer of its own — the draft-review step is now a pure mid-run hold and the approve / request-changes / reject decision is taken on the review step Cinatra opens for the generated draft (core artifact-lifecycle interception). The four metadata-only child review gate steps and the required `@cinatra-ai/reviewer-agent` runtime dependency are removed; `renderer-binding-gate.mjs` gains a fail-closed exact-identity ratchet against the retired lifecycle agents
+- feat: the pipeline no longer composes a reviewer of its own — the draft-review step is now a pure mid-run hold and the approve / request-changes / reject decision is taken on the review step Cinatra opens for the generated draft (core artifact-lifecycle interception). The four metadata-only child review gate steps and the required `@cinatra-ai/reviewer-agent` runtime dependency are removed; `renderer-binding-gate.mjs` gains a fail-closed exact-identity ratchet against the retired lifecycle agents (#59)
+- chore: republish the stored-ideas declaration (`blog_pipeline_ideas`) that changed after 0.2.0 was published, so version-pinned installs resolve the current manifest (#60)
 
 ## v0.1.2 — 2026-07-07
 
