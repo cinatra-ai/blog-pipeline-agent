@@ -2,7 +2,8 @@
 //
 // Every case below pins one sentence of that walk onto the flow definition, in
 // the order the walk happens: the stored ideas offered as a real list, the pick
-// that is its own reservation, the draft written while the run is still going,
+// that is its own reservation, the brand voice the post is written in, the draft
+// written while the run is still going,
 // the picture made before anyone reviews anything, the review opened on what the
 // run made, the LinkedIn post at the end, and the pauses the pipeline really has.
 //
@@ -302,21 +303,63 @@ test("the end node binds the LinkedIn post and nothing else", () => {
 // 7. "The pipeline declares the pauses it really has." (8.4, P6 item 8)
 // ---------------------------------------------------------------------------
 
-test("the pipeline has exactly the three pauses of its own that the walk describes", () => {
+test("the pipeline has exactly the four pauses of its own that the walk describes", () => {
+  // The rail a person reads is the pipeline's declared pauses, in the walk's
+  // order: the idea, the brand voice the post is written in, the review of what
+  // the run made, and the LinkedIn post.
   assert.deepEqual(nodesOfType("InputMessageNode"), [
     "idea_selection_gate",
+    "brand_voice_gate",
     "draft_review_gate",
     "linkedin_review_gate",
   ]);
   for (const id of nodesOfType("InputMessageNode")) {
     assert.equal(parts[id].metadata.cinatra.requiresApproval, true, `${id} is a real pause`);
+    assert.equal(parts[id].metadata.cinatra.riskClass, "read_only", `${id} asks, it never writes`);
   }
+});
+
+test("the run parks for the brand-voice pick before any draft is written", () => {
+  // Plan (C) section 6: one pause for brand voice, before the draft. The pause
+  // is a gate of this flow's own, shaped like the other three so the host draws
+  // it as a rail entry.
+  const gate = parts.brand_voice_gate;
+  assert.ok(gate, "the flow declares the brand-voice pause");
+  assert.equal(gate.component_type, "InputMessageNode", "a gate the runner parks on");
+  assert.equal(gate.metadata.cinatra.requiresApproval, true);
+  assert.equal(gate.metadata.cinatra.riskClass, "read_only");
+  assert.ok(gate.metadata.cinatra.a2uiSurfaceId, "the host is told which surface draws it");
+  assert.ok(at("reserve_idea") < at("brand_voice_gate"), "the idea is taken first");
+  assert.ok(at("brand_voice_gate") < at("draft_flow"), "the voice is picked before the writer runs");
+  assert.ok(at("brand_voice_gate") < at("write_draft"), "and nothing is written before the pick");
+  const schema = gate.metadata.cinatra.inputMessageSchema;
+  assert.ok(
+    schema.properties.brandVoice,
+    "the brand-voice material is the thing the gate asks a person to pick",
+  );
+  const out = gate.outputs.find((o) => o.title === "brandVoice");
+  assert.ok(out, "and the pick leaves the gate as its own output");
+  assert.equal(out.default, "", "an unanswered pick is an empty voice, not a dead end");
+});
+
+test("the brand-voice pick is handed down to the writing step", () => {
+  // "One brand-voice pick handed down": the writer declares `voice` and, until
+  // this edge, nothing in the run ever filled it — every post was drafted with
+  // no voice at all.
+  const edge = edgeInto("draft_flow", "voice");
+  assert.ok(edge, "the draft writer's voice input is fed by the run");
+  assert.equal(edge.source_node.$component_ref, "brand_voice_gate", "by the pick a person made");
+  assert.equal(edge.source_output, "brandVoice");
+  const writer = parts[parts.draft_flow.subflow.$component_ref];
+  const declared = (writer.inputs ?? []).map((i) => i.title);
+  assert.ok(declared.includes("voice"), "and the writer really takes it");
 });
 
 test("each pause is declared where a person reads what the pipeline does", () => {
   const readme = readFileSync(join(root, "README.md"), "utf8");
-  assert.match(readme, /pauses three times/i);
-  assert.match(manifest.description, /three HITL pauses/i);
+  assert.match(readme, /pauses four times/i);
+  assert.match(readme, /brand voice/i, "the brand-voice pause is named where a person reads it");
+  assert.match(manifest.description, /four HITL pauses/i);
   assert.ok(!/imageCount/.test(readme), "the picture count is retired from the contract too");
 });
 
@@ -463,7 +506,7 @@ test("the review's target set is the run's own reference, in the shape the revie
   assert.equal(revEdge.source_output, "representationRevisionId");
 });
 
-test("every road from the start to the end passes the three pauses, in the walk's order", () => {
+test("every road from the start to the end passes the four pauses, in the walk's order", () => {
   // Order of DISCOVERY is not order of EXECUTION. A pause reachable on one road
   // and bypassed on another is a pause that does not hold.
   const next = new Map();
@@ -472,7 +515,12 @@ test("every road from the start to the end passes the three pauses, in the walk'
     if (!next.has(from)) next.set(from, []);
     next.get(from).push(edge.to_node.$component_ref);
   }
-  const gates = ["idea_selection_gate", "draft_review_gate", "linkedin_review_gate"];
+  const gates = [
+    "idea_selection_gate",
+    "brand_voice_gate",
+    "draft_review_gate",
+    "linkedin_review_gate",
+  ];
   const ends = ownNodes().filter((id) => parts[id].component_type === "EndNode");
   assert.ok(ends.length > 0, "the flow ends somewhere");
   const roads = [];
@@ -492,11 +540,14 @@ test("every road from the start to the end passes the three pauses, in the walk'
     for (let i = 0; i < gates.length; i += 1) {
       assert.notEqual(seen[i], -1, `the road ${road.join("->")} skips ${gates[i]}`);
     }
-    assert.ok(seen[0] < seen[1], "the idea is chosen before the draft is reviewed");
-    assert.ok(seen[1] < seen[2], "the draft is reviewed before the LinkedIn post is approved");
+    assert.ok(seen[0] < seen[1], "the idea is chosen before the voice is picked");
+    assert.ok(seen[1] < seen[2], "the voice is picked before the draft is reviewed");
+    assert.ok(seen[2] < seen[3], "the draft is reviewed before the LinkedIn post is approved");
     // the preparation, the write and the picture are on every road too, and in order
     for (const [before, after] of [
       ["prepare_ideas", "idea_selection_gate"],
+      ["brand_voice_gate", "draft_flow"],
+      ["brand_voice_gate", "write_draft"],
       ["write_draft", "image_flow"],
       ["image_flow", "draft_review_gate"],
     ]) {
