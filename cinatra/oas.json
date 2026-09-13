@@ -3,7 +3,7 @@
   "component_type": "Flow",
   "id": "blog-pipeline-agent-flow",
   "name": "Blog Pipeline Agent",
-  "description": "Parent orchestrator (WayFlow Flow OAS) that turns one stored blog idea into a reviewed blog post, its featured image and the LinkedIn post that announces it. Manual brief and reference material only; transcript input is not accepted. Three pauses of its own: the stored-ideas gate, the review the run parks at, and the LinkedIn post.",
+  "description": "Parent orchestrator (WayFlow Flow OAS) that turns one stored blog idea into a reviewed blog post, its featured image and the LinkedIn post that announces it. Manual brief and reference material only; transcript input is not accepted. Four pauses of its own: the stored-ideas gate, the brand-voice pick the draft is written in, the review the run parks at, and the LinkedIn post.",
   "metadata": {
     "cinatra": {
       "type": "flow",
@@ -116,6 +116,9 @@
       "$component_ref": "reserve_idea"
     },
     {
+      "$component_ref": "brand_voice_gate"
+    },
+    {
       "$component_ref": "draft_flow"
     },
     {
@@ -202,12 +205,26 @@
     },
     {
       "component_type": "ControlFlowEdge",
-      "id": "reserve_idea->draft_flow",
-      "name": "reserve_idea->draft_flow",
+      "id": "reserve_idea->brand_voice_gate",
+      "name": "reserve_idea->brand_voice_gate",
       "description": "",
       "metadata": {},
       "from_node": {
         "$component_ref": "reserve_idea"
+      },
+      "from_branch": null,
+      "to_node": {
+        "$component_ref": "brand_voice_gate"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "brand_voice_gate->draft_flow",
+      "name": "brand_voice_gate->draft_flow",
+      "description": "",
+      "metadata": {},
+      "from_node": {
+        "$component_ref": "brand_voice_gate"
       },
       "from_branch": null,
       "to_node": {
@@ -477,6 +494,21 @@
         "$component_ref": "draft_flow"
       },
       "destination_input": "idea"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "brandVoice:brand_voice_gate->draft_flow.voice",
+      "name": "brandVoice:brand_voice_gate->draft_flow",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "brand_voice_gate"
+      },
+      "source_output": "brandVoice",
+      "destination_node": {
+        "$component_ref": "draft_flow"
+      },
+      "destination_input": "voice"
     },
     {
       "component_type": "DataFlowEdge",
@@ -1193,6 +1225,37 @@
           "description": "The pick is the reservation (plan (C) section 5.1): the chosen artifact and revision are validated against the very list the person was shown and written as one reservation row under the rule that allows one live row per idea, so of two runs offering the same idea only one takes it and the loser is told so. The idea's own words come back as the draft writer's one input. A refused pick answers with its reason and none of the three fields below, which carry no default: the run ends there rather than drafting an idea nobody chose."
         }
       }
+    },
+    "brand_voice_gate": {
+      "component_type": "InputMessageNode",
+      "id": "brand_voice_gate",
+      "name": "Pick the brand voice",
+      "metadata": {
+        "cinatra": {
+          "riskClass": "read_only",
+          "requiresApproval": true,
+          "a2uiSurfaceId": "blog-pipeline:brand-voice",
+          "inputMessageSchema": {
+            "type": "object",
+            "properties": {
+              "brandVoice": {
+                "type": "string",
+                "title": "Brand voice",
+                "description": "The brand-voice material this post is written in: the voice instructions, or example sentences to mirror. Leave it empty to write in the pipeline's default voice.",
+                "x-multiline": true
+              }
+            }
+          },
+          "description": "The brand-voice pause of plan (C) section 6: one pause for the brand voice, before the draft is written. A person picks the brand-voice material the post is written in \u2014 the voice instructions, or the example sentences the writer mirrors \u2014 and that ONE pick is handed down to the writing step, which takes it as its `voice` input. The pick is not a required field: a person with no brand-voice material to give can continue, and the writer drafts in its default voice exactly as it did before this pause existed. This flow owns the pause; nothing is picked for the person."
+        }
+      },
+      "outputs": [
+        {
+          "title": "brandVoice",
+          "type": "string",
+          "default": ""
+        }
+      ]
     },
     "draft_flow": {
       "component_type": "FlowNode",
