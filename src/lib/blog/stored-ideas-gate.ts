@@ -14,9 +14,11 @@
  * what a person is told when their pick lost the race.
  *
  * THIS MODULE IS THE PACK'S OWN. The decision logic and the table it names belong
- * to the extension that ships them, not to the runtime that runs them: the host
- * owns the passthrough these calls travel through and never a pack's business
- * logic or its physical table names.
+ * to the extension that ships them, not to the runtime that runs them: a fixed
+ * step of this pack asks the host's ONE generic dispatch to run a tool this pack
+ * DECLARES, the host resolves that name against this pack's own manifest and
+ * loads the module from this pack's own tree, and it holds neither a pack's
+ * business logic nor its physical table names.
  */
 
 /** This package, as its manifest names it. The one place the name is written. */
@@ -158,7 +160,7 @@ export function requireIdeaType(raw: Record<string, unknown>): string {
   if (ideaType.length === 0) {
     throw new IdeaTypeRefusal(
       "invalid-request",
-      "blog_pipeline_ideas: `ideaType` is required — the calling extension names the artifact type " +
+      "stored_ideas: `ideaType` is required — the calling extension names the artifact type " +
         "its ideas are filed under, and it must be one of its own declared dependencies",
     );
   }

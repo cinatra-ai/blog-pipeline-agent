@@ -16,12 +16,13 @@
  *                          relation, keyed by run and idea, so a retry after a
  *                          failure completes the SAME row and never a second.
  *
- * EVERY READ AND WRITE IS A PORT. The real ports are the scoped tools the host
- * admits on its passthrough — the dependency-scoped artifact reads and the
- * extension-data tool on this pack's own declared table — and nothing here knows
- * that, so the whole gate is provable without a database and the two fixtures a
- * live fleet cannot supply ("two runs picking the same idea at once", "a run that
- * fails after its draft is written") are ordinary tests.
+ * EVERY READ AND WRITE IS A PORT. The real ports are the ones the host hands the
+ * module this pack DECLARES when a fixed step dispatches it — the dependency-
+ * scoped artifact reads and the extension-data operations on this pack's own
+ * declared table — and nothing here knows that, so the whole gate is provable
+ * without a database and the two fixtures a live fleet cannot supply ("two runs
+ * picking the same idea at once", "a run that fails after its draft is written")
+ * are ordinary tests.
  */
 
 import {
