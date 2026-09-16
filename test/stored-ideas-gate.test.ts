@@ -463,9 +463,10 @@ describe("the relation the pack declares is the relation the gate names", () => 
 });
 
 describe("the calling extension names the artifact type its ideas are filed under", () => {
-  // The refusal carried over from the host passthrough word for word: a call that
-  // names no type is refused rather than widened to every type the extension may
-  // read — the offer would then be a list of posts and pictures.
+  // The refusal carried over word for word from the tool the host used to own,
+  // under the name this pack now declares: a call that names no type is refused
+  // rather than widened to every type the extension may read — the offer would
+  // then be a list of posts and pictures.
   it("returns the type the caller named", () => {
     assert.equal(requireIdeaType({ ideaType: "@cinatra-ai/blog-idea-artifact:idea" }), "@cinatra-ai/blog-idea-artifact:idea");
   });
@@ -502,6 +503,32 @@ describe("the calling extension names the artifact type its ideas are filed unde
     }
   });
 
+  it("names the tool this pack DECLARES, never the tool the host used to own", () => {
+    // The refusal a person reads is prefixed by the tool the call asked for, and
+    // the call now asks for this pack's OWN declared name: the fixed step sends
+    // the host's one generic dispatch and the name is resolved against this
+    // manifest. A refusal still carrying the retired host tool name would name a
+    // tool no call can ask for any more.
+    const declaredTools = (
+      JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
+        cinatra: { tools: Array<{ name: string; module: string }> };
+      }
+    ).cinatra.tools;
+    const declared = declaredTools.find((tool) => tool.module === "./cinatra/tools/stored-ideas.mjs");
+    assert.ok(declared, "this pack declares a tool whose module is the stored-ideas module");
+    const declaredToolName = declared.name;
+    try {
+      requireIdeaType({});
+      assert.fail("a call naming no type is refused");
+    } catch (error) {
+      assert.ok(error instanceof IdeaTypeRefusal);
+      assert.ok(
+        error.message.startsWith(`${declaredToolName}: `),
+        `the refusal is prefixed by the declared tool name, not by "${error.message.split(":")[0]}"`,
+      );
+    }
+  });
+
   it("refuses a call that names no type, with the refusal it has always carried", () => {
     for (const nothing of [{}, { ideaType: "" }, { ideaType: "   " }, { ideaType: 42 }, { ideaType: null }]) {
       assert.throws(
@@ -511,7 +538,7 @@ describe("the calling extension names the artifact type its ideas are filed unde
           assert.equal(error.reason, "invalid-request");
           assert.equal(
             error.message,
-            "blog_pipeline_ideas: `ideaType` is required — the calling extension names the artifact type " +
+            "stored_ideas: `ideaType` is required — the calling extension names the artifact type " +
               "its ideas are filed under, and it must be one of its own declared dependencies",
           );
           return true;
