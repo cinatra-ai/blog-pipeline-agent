@@ -3,6 +3,10 @@
 All notable changes to this project are documented here, derived from the
 project's merged pull request and release-tag history.
 
+## v0.2.4 — 2026-09-17
+
+- fix: the step that asks a person to pick a stored blog idea draws its list again — the select-idea gate surfaces its declared inputs, so the ideas on offer and the reason behind the offer reach the step instead of leaving it saying there is nothing to pick (#65)
+
 ## v0.2.3 — 2026-09-16
 
 - chore: the stored-ideas gate is written as what it now is — a tool this package declares, which the pipeline's three fixed steps reach through the one generic extension-tool dispatch Cinatra offers every extension — and the refusal a caller reads when it names no artifact type is prefixed by that declared tool name (`stored_ideas`) instead of the tool name the host used to own
