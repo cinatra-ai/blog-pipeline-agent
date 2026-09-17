@@ -170,6 +170,27 @@ test("the gate offers that list, not a free-text field and not an in-run batch",
   );
 });
 
+test("the gate surfaces its declared inputs to the renderer that draws them", () => {
+  // A gate that declares inputs is folded into a message template before it
+  // runs, and the default fold renders to nothing at all. A gate whose page is
+  // drawn FROM those inputs must therefore opt them into the surface, or the
+  // list arrives empty and the step draws its nothing-to-pick floor instead of
+  // the stored ideas themselves.
+  const gate = parts.idea_selection_gate;
+  assert.equal(gate.component_type, "InputMessageNode", "the step is a pause the runner parks on");
+  assert.ok((gate.inputs ?? []).length > 0, "whose page is drawn from declared inputs");
+  assert.equal(
+    gate.metadata.cinatra.renderer,
+    "@cinatra-ai/blog-pipeline-agent:idea-selection",
+    "and this pack serves the renderer that draws them",
+  );
+  assert.equal(
+    gate.metadata.cinatra.surfaceGateInputs,
+    true,
+    "so the gate opts its declared values into the surface its renderer reads",
+  );
+});
+
 // ---------------------------------------------------------------------------
 // 2. "The pick is the reservation." (5.1; the selected-idea save retires)
 // ---------------------------------------------------------------------------
