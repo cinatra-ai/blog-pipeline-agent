@@ -1103,6 +1103,7 @@
         "cinatra": {
           "riskClass": "read_only",
           "requiresApproval": true,
+          "surfaceGateInputs": true,
           "renderer": "@cinatra-ai/blog-pipeline-agent:idea-selection",
           "a2uiSurfaceId": "blog-pipeline:idea-selection",
           "inputMessageSchema": {
