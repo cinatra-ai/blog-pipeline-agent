@@ -53,7 +53,8 @@ const IDEA_TAKEN_REASON =
   "That blog idea was just taken by another run. The list has been refreshed — pick another one.";
 const EMPTY_LIST_REASON =
   "There is no blog idea left to draft: every stored idea already has a draft or is reserved by " +
-  "another run. Generate new ideas, then start the pipeline again.";
+  "another run. This list was read when the run reached this step, and it does not change while the " +
+  "run waits here. Generate new ideas; the next run of this pipeline offers them.";
 const NO_LIST_REASON =
   "The idea gate has no offered list to validate a pick against, so no idea can be taken. " +
   "The run stops rather than drafting an idea nobody chose.";
