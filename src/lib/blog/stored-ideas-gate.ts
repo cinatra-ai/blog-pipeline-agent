@@ -111,7 +111,8 @@ export const IDEA_TAKEN_REASON =
 
 const EMPTY_LIST_REASON =
   "There is no blog idea left to draft: every stored idea already has a draft or is reserved by " +
-  "another run. Generate new ideas, then start the pipeline again.";
+  "another run. This list was read when the run reached this step, and it does not change while the " +
+  "run waits here. Generate new ideas; the next run of this pipeline offers them.";
 
 /** A refusal this gate raises before anything is read or written. `reason` is the
  *  machine-readable class the passthrough reports it under. */

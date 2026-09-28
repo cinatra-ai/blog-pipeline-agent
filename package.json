@@ -98,7 +98,11 @@
         "id": "@cinatra-ai/blog-pipeline-agent:idea-selection",
         "kind": "blog-idea-selection",
         "priority": 80,
-        "midRunHitl": true
+        "midRunHitl": true,
+        "params": {
+          "question": "Which stored blog idea should this run draft?",
+          "emptyStateMessage": "There is no blog idea left to draft: every stored idea already has a draft or is reserved by another run. This list was read when the run reached this step, and it does not change while the run waits here. Generate new ideas; the next run of this pipeline offers them."
+        }
       }
     ],
     "packageType": "agent",
