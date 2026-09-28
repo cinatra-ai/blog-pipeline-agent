@@ -119,7 +119,16 @@ function elementsWith(markup, attrPattern) {
   return out;
 }
 
-const textOf = (el) => unescapeHtml(el.inner.replace(/<[^>]*>/g, ""));
+const stripTags = (markup) => {
+  let text = markup;
+  let before;
+  do {
+    before = text;
+    text = text.replace(/<[^>]*>/g, "");
+  } while (text !== before);
+  return text;
+};
+const textOf = (el) => unescapeHtml(stripTags(el.inner));
 const classesOf = (el) => (el.attrs.match(/\bclass="([^"]*)"/)?.[1] ?? "").split(/\s+/).filter(Boolean);
 
 const QUESTION = /\bdata-testid="idea-selection-gate-question"/;
