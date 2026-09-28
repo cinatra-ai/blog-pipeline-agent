@@ -7,6 +7,19 @@
   "files": [
     "cinatra"
   ],
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
   "cinatra": {
     "apiVersion": "cinatra.ai/v1",
     "kind": "agent",
@@ -102,6 +115,10 @@
         "params": {
           "question": "Which stored blog idea should this run draft?",
           "emptyStateMessage": "There is no blog idea left to draft: every stored idea already has a draft or is reserved by another run. This list was read when the run reached this step, and it does not change while the run waits here. Generate new ideas; the next run of this pipeline offers them."
+        },
+        "component": {
+          "entry": "./src/renderers/idea-selection.ts",
+          "propsApiVersion": 1
         }
       }
     ],
