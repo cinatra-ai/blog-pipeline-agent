@@ -513,10 +513,13 @@ test("the review's target set is the run's own reference, in the shape the revie
   const rendered = template.replace(/\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g, (_m, name) => `RENDERED-${name}`);
   const targets = JSON.parse(rendered);
   assert.ok(Array.isArray(targets), "a JSON array of references");
-  assert.equal(targets.length, 1, "the post today; a picture joins it when one is filed");
+  assert.equal(targets.length, 2, "the post first, and then its picture");
   assert.deepEqual(Object.keys(targets[0]).sort(), ["artifactId", "representationRevisionId"]);
   assert.equal(targets[0].artifactId, "RENDERED-draftArtifactId");
   assert.equal(targets[0].representationRevisionId, "RENDERED-draftRevisionId");
+  assert.deepEqual(Object.keys(targets[1]).sort(), ["artifactId", "representationRevisionId"]);
+  assert.equal(targets[1].artifactId, "RENDERED-imageArtifactId");
+  assert.equal(targets[1].representationRevisionId, "RENDERED-imageRevisionId");
   // and both of those are the mid-run write's own outputs, not loose text.
   const write = toolNodes("artifact_materialize")[0];
   const idEdge = edgeInto(projection, "draftArtifactId");
@@ -525,6 +528,15 @@ test("the review's target set is the run's own reference, in the shape the revie
   assert.equal(idEdge.source_output, "artifactId");
   assert.equal(revEdge.source_node.$component_ref, write);
   assert.equal(revEdge.source_output, "representationRevisionId");
+  // the picture's pair is the filing step's own two outputs.
+  const filed = toolNodes("artifact_image_generate");
+  assert.equal(filed.length, 1, "one step files the picture");
+  const imageIdEdge = edgeInto(projection, "imageArtifactId");
+  const imageRevEdge = edgeInto(projection, "imageRevisionId");
+  assert.equal(imageIdEdge.source_node.$component_ref, filed[0]);
+  assert.equal(imageIdEdge.source_output, "artifactId");
+  assert.equal(imageRevEdge.source_node.$component_ref, filed[0]);
+  assert.equal(imageRevEdge.source_output, "representationRevisionId");
 });
 
 test("every road from the start to the end passes the four pauses, in the walk's order", () => {
@@ -580,20 +592,31 @@ test("every road from the start to the end passes the four pauses, in the walk's
   }
 });
 
-test("the picture files nothing yet, and the review's set says so rather than pretending", () => {
-  // The image maker settles the featured image's record; the host tool that
-  // files the bytes is not built. This case is the honest statement of that gap
-  // AND its tripwire: the moment the picture returns a reference, this goes red
-  // and the projection must grow a second entry.
+test("the picture is filed, and the review's set names it after the post", () => {
+  // The image maker settles the featured image's record; the next step files
+  // that record through the host's image tool, and the reference it returns is
+  // what the projection names after the post.
   const image = parts[parts.image_flow.subflow.$component_ref];
   const outputs = (image.outputs ?? []).map((o) => o.title).sort();
-  assert.deepEqual(outputs, ["image", "notes"], "the picture answers with its record, not a reference");
+  assert.deepEqual(outputs, ["image", "notes"], "the picture still answers with its record");
+  const filed = toolNodes("artifact_image_generate");
+  assert.equal(filed.length, 1, "one step files the picture");
+  const record = edgeInto(filed[0], "image");
+  assert.ok(record, "the filing step reads the picture's record");
+  assert.equal(record.source_node.$component_ref, "image_flow");
+  assert.equal(record.source_output, "image");
   const projection = storedIdeasNodes("complete")[0];
   const feeding = oas.data_flow_connections.filter(
     (e) => e.destination_node.$component_ref === projection,
   );
   assert.ok(
-    !feeding.some((e) => e.source_node.$component_ref === "image_flow"),
-    "nothing from the picture reaches the review's target set while it files nothing",
+    feeding.some((e) => e.source_node.$component_ref === filed[0] && e.source_output === "artifactId"),
+    "the filing step's reference reaches the review's target set",
+  );
+  assert.ok(
+    feeding.some(
+      (e) => e.source_node.$component_ref === filed[0] && e.source_output === "representationRevisionId",
+    ),
+    "and so does its revision",
   );
 });

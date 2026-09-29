@@ -1,9 +1,9 @@
 // A produces entry is a promise the run keeps. The pipeline files its draft and
-// its LinkedIn post through terminal bindings, so it declares those two. Its
-// ideas and its pictures are written mid-run, and that road is not built yet —
-// declaring them now would be a promise nothing keeps, and the fleet's adoption
-// gate refuses exactly that (a declared production with no materialization).
-// The two entries return with their write roads.
+// its LinkedIn post through terminal bindings, so it declares those two. The
+// pictures' road has arrived: the run files its featured image mid-run through
+// the host's image tool, so the blog image is declared beside them. The ideas'
+// entry still waits for its own road, because declaring it before that road is
+// built would be a promise nothing keeps.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -21,12 +21,16 @@ const KEPT = [
     objectTypeId: "@cinatra-ai/blog-post-artifact:post",
   },
   {
+    extension: "@cinatra-ai/blog-image-artifact",
+    objectTypeId: "@cinatra-ai/blog-image-artifact:blog-image",
+  },
+  {
     extension: "@cinatra-ai/linkedin-artifacts",
     objectTypeId: "@cinatra-ai/linkedin:post-draft",
   },
 ];
 
-test("it declares exactly the two productions it materializes today", () => {
+test("it declares exactly the three productions it materializes", () => {
   assert.deepEqual(manifest.cinatra.produces, KEPT);
   assert.deepEqual(oas.metadata.cinatra.produces, KEPT);
 });
@@ -43,10 +47,16 @@ test("every declared production has a road that keeps it", () => {
       (n) => n && n.component_type === "ApiNode" && n.data && n.data.tool === "artifact_materialize",
     )
     .map((n) => n.data.input.extension);
+  const filed = Object.values(oas.$referenced_components)
+    .filter(
+      (n) => n && n.component_type === "ApiNode" && n.data && n.data.tool === "artifact_image_generate",
+    )
+    .map((n) => n.data.input.extension);
   assert.deepEqual(bound, ["@cinatra-ai/linkedin-artifacts"]);
   assert.deepEqual(written, ["@cinatra-ai/blog-post-artifact"]);
+  assert.deepEqual(filed, ["@cinatra-ai/blog-image-artifact"]);
   assert.deepEqual(
-    [...bound, ...written].sort(),
+    [...bound, ...written, ...filed].sort(),
     KEPT.map((p) => p.extension).sort(),
   );
 });
