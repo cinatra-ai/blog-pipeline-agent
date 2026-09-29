@@ -4039,6 +4039,7 @@
         "cinatra": {
           "riskClass": "read_only",
           "requiresApproval": true,
+          "surfaceGateInputs": true,
           "a2uiSurfaceId": "blog-pipeline:draft-review",
           "inputMessageSchema": {
             "type": "object",
@@ -4494,17 +4495,18 @@
         "cinatra": {
           "riskClass": "read_only",
           "requiresApproval": true,
+          "surfaceGateInputs": true,
           "a2uiSurfaceId": "blog-pipeline:linkedin-review",
           "inputMessageSchema": {
             "type": "object",
             "properties": {
-              "linkedinApproval": {
+              "linkedinPost": {
                 "type": "string",
                 "title": "The LinkedIn post"
               }
             },
             "required": [
-              "linkedinApproval"
+              "linkedinPost"
             ]
           },
           "description": "The last pause of plan (C) section 6.1 step 5: the LinkedIn post the writer made from the revision the person continued with, held for that person to approve before the run ends and the post is filed as a LinkedIn post-draft. The publishing steps are their own agents and are not in this flow."
