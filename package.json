@@ -139,6 +139,10 @@
         "objectTypeId": "@cinatra-ai/blog-post-artifact:post"
       },
       {
+        "extension": "@cinatra-ai/blog-image-artifact",
+        "objectTypeId": "@cinatra-ai/blog-image-artifact:blog-image"
+      },
+      {
         "extension": "@cinatra-ai/linkedin-artifacts",
         "objectTypeId": "@cinatra-ai/linkedin:post-draft"
       }

@@ -17,6 +17,10 @@
           "objectTypeId": "@cinatra-ai/blog-post-artifact:post"
         },
         {
+          "extension": "@cinatra-ai/blog-image-artifact",
+          "objectTypeId": "@cinatra-ai/blog-image-artifact:blog-image"
+        },
+        {
           "extension": "@cinatra-ai/linkedin-artifacts",
           "objectTypeId": "@cinatra-ai/linkedin:post-draft"
         }
@@ -126,6 +130,9 @@
     },
     {
       "$component_ref": "image_flow"
+    },
+    {
+      "$component_ref": "file_image"
     },
     {
       "$component_ref": "complete_relation"
@@ -261,12 +268,26 @@
     },
     {
       "component_type": "ControlFlowEdge",
-      "id": "image_flow->complete_relation",
-      "name": "image_flow->complete_relation",
+      "id": "image_flow->file_image",
+      "name": "image_flow->file_image",
       "description": "",
       "metadata": {},
       "from_node": {
         "$component_ref": "image_flow"
+      },
+      "from_branch": null,
+      "to_node": {
+        "$component_ref": "file_image"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "file_image->complete_relation",
+      "name": "file_image->complete_relation",
+      "description": "",
+      "metadata": {},
+      "from_node": {
+        "$component_ref": "file_image"
       },
       "from_branch": null,
       "to_node": {
@@ -764,6 +785,96 @@
         "$component_ref": "complete_relation"
       },
       "destination_input": "cinatra_run_id"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "image:image_flow->file_image.image",
+      "name": "image:image_flow->file_image",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "image_flow"
+      },
+      "source_output": "image",
+      "destination_node": {
+        "$component_ref": "file_image"
+      },
+      "destination_input": "image"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "title:draft_flow->file_image.title",
+      "name": "title:draft_flow->file_image",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "draft_flow"
+      },
+      "source_output": "title",
+      "destination_node": {
+        "$component_ref": "file_image"
+      },
+      "destination_input": "title"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "artifactId:write_draft->file_image.postArtifactId",
+      "name": "artifactId:write_draft->file_image",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "write_draft"
+      },
+      "source_output": "artifactId",
+      "destination_node": {
+        "$component_ref": "file_image"
+      },
+      "destination_input": "postArtifactId"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "cinatra_run_id:start->file_image.cinatra_run_id",
+      "name": "cinatra_run_id:start->file_image",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "cinatra_run_id",
+      "destination_node": {
+        "$component_ref": "file_image"
+      },
+      "destination_input": "cinatra_run_id"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "artifactId:file_image->complete_relation.imageArtifactId",
+      "name": "artifactId:file_image->complete_relation",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "file_image"
+      },
+      "source_output": "artifactId",
+      "destination_node": {
+        "$component_ref": "complete_relation"
+      },
+      "destination_input": "imageArtifactId"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "representationRevisionId:file_image->complete_relation.imageRevisionId",
+      "name": "representationRevisionId:file_image->complete_relation",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "file_image"
+      },
+      "source_output": "representationRevisionId",
+      "destination_node": {
+        "$component_ref": "complete_relation"
+      },
+      "destination_input": "imageRevisionId"
     },
     {
       "component_type": "DataFlowEdge",
@@ -2715,7 +2826,7 @@
       "metadata": {
         "cinatra": {
           "packageName": "@cinatra-ai/blog-image-generator-agent",
-          "description": "Child FlowNode to @cinatra-ai/blog-image-generator-agent, the image maker the retired prompt writer became. It runs on the post the run just wrote and before the review, so the review sees the post with its featured image. The picture's own bytes are filed by the host's image tool, which is not built yet; until it is, this step settles the featured image's record and files nothing, and the review's target set names the post alone."
+          "description": "Child FlowNode to @cinatra-ai/blog-image-generator-agent, the image maker the retired prompt writer became. It runs on the post the run just wrote and before the review, so the review sees the post with its featured image. This step settles the featured image's prompt and its alternative text; the next step files the picture through the host's image tool, and the review's target set names it after the post."
         }
       }
     },
@@ -3950,6 +4061,90 @@
         }
       }
     },
+    "file_image": {
+      "component_type": "ApiNode",
+      "id": "file_image",
+      "name": "File the featured image",
+      "url": "{{CINATRA_BASE_URL}}/api/agents/passthrough",
+      "http_method": "POST",
+      "data": {
+        "tool": "artifact_image_generate",
+        "input": {
+          "extension": "@cinatra-ai/blog-image-artifact",
+          "objectTypeId": "@cinatra-ai/blog-image-artifact:blog-image",
+          "title": "{{ title }}",
+          "prompt": "{# pyagentspec-input-hint (do not remove): {{ image }} #}{{ image.prompt }}",
+          "dataJson": "{# pyagentspec-input-hint (do not remove): {{ image }} {{ postArtifactId }} #}{\"post\":{{ postArtifactId | tojson }},\"placement\":\"featured\",\"altText\":{{ image.altText | tojson }}}",
+          "node_id": "file_image"
+        },
+        "agent_run_id": "{{ cinatra_run_id }}"
+      },
+      "inputs": [
+        {
+          "title": "title",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "image",
+          "type": "object",
+          "json_schema": {
+            "type": "object",
+            "properties": {
+              "placement": {
+                "type": "string",
+                "enum": [
+                  "featured"
+                ]
+              },
+              "post": {
+                "type": "string"
+              },
+              "prompt": {
+                "type": "string"
+              },
+              "altText": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "placement",
+              "post",
+              "prompt",
+              "altText"
+            ]
+          }
+        },
+        {
+          "title": "postArtifactId",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "cinatra_run_id",
+          "type": "string",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "artifactId",
+          "type": "string"
+        },
+        {
+          "title": "representationRevisionId",
+          "type": "string"
+        }
+      ],
+      "metadata": {
+        "cinatra": {
+          "riskClass": "write",
+          "requiresApproval": false,
+          "packageName": "@cinatra-ai/blog-pipeline-agent",
+          "description": "The featured image the step before settled is filed here as a blog image through the host's image tool, named after the post and carrying the post it belongs to, its placement and its alternative text. The reference it returns is what the review's target set names second."
+        }
+      }
+    },
     "complete_relation": {
       "component_type": "ApiNode",
       "id": "complete_relation",
@@ -3965,7 +4160,7 @@
             "ideaType": "@cinatra-ai/blog-idea-artifact:blog-idea",
             "ideaArtifactId": "{{ ideaArtifactId }}",
             "draftArtifactId": "{{ draftArtifactId }}",
-            "reviewTargets": "[{\"artifactId\": \"{{ draftArtifactId }}\", \"representationRevisionId\": \"{{ draftRevisionId }}\"}]"
+            "reviewTargets": "[{\"artifactId\": \"{{ draftArtifactId }}\", \"representationRevisionId\": \"{{ draftRevisionId }}\"}, {\"artifactId\": \"{{ imageArtifactId }}\", \"representationRevisionId\": \"{{ imageRevisionId }}\"}]"
           }
         },
         "agent_run_id": "{{ cinatra_run_id }}",
@@ -3985,6 +4180,16 @@
         },
         {
           "title": "draftRevisionId",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "imageArtifactId",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "imageRevisionId",
           "type": "string",
           "default": ""
         },
@@ -4011,7 +4216,7 @@
           "riskClass": "write",
           "requiresApproval": false,
           "packageName": "@cinatra-ai/blog-pipeline-agent",
-          "description": "Two sentences of plan (C) section 6.1 in one call. It completes the reservation into the relation row \u2014 this idea, this draft, keyed by run and idea so a retry completes the same row and never a second \u2014 and it is the projection step of section 8.4: the call echoes its own input back, so the immutable reference the mid-run write returned reaches the review step as the set the marker below names. The set names the post; a picture joins it when the host's image tool files one. The call answers with the completion own ok flag, so a completion that did not land is visible in the run rather than hidden behind the echo; the run does not branch on it here, and an uncompleted reservation lapses on its own."
+          "description": "Two sentences of plan (C) section 6.1 in one call. It completes the reservation into the relation row \u2014 this idea, this draft, keyed by run and idea so a retry completes the same row and never a second \u2014 and it is the projection step of section 8.4: the call echoes its own input back, so the immutable reference the mid-run write returned reaches the review step as the set the marker below names. The set names the post first and its featured image second. The call answers with the completion own ok flag, so a completion that did not land is visible in the run rather than hidden behind the echo; the run does not branch on it here, and an uncompleted reservation lapses on its own."
         }
       }
     },
