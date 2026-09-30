@@ -44,6 +44,9 @@ const RELEASED = "released";
 /** How many stored ideas one gate reads content for. A person choosing from more
  *  than this is choosing from a list nobody reads, and each entry costs a read. */
 const MAX_OFFERED_IDEAS = 100;
+/** How many pages of the list one gate reads: a bounded walk, the same bound the
+ *  replaced gate kept. */
+const MAX_LISTING_PAGES = 10;
 
 /** Two days: long enough for a run that parks at a review over a weekend, short
  *  enough that an abandoned run does not hold an idea for ever. */
@@ -221,7 +224,9 @@ async function readIdeaText(ports, reference) {
 }
 
 /**
- * The list the gate offers. An empty list ends the run with the sentence it
+ * The list the gate offers. The list is read page by page, with the mark each
+ * page returns for the next one, until the offer is full, the list has ended or
+ * the page bound is reached. An empty list ends the run with the sentence it
  * carries, never with a pick nobody made.
  */
 async function prepare(input, ports) {
@@ -234,22 +239,32 @@ async function prepare(input, ports) {
   // list the sweep just widened.
   const live = await releaseExpiredReservations(ports, rows, now);
   const taken = new Set(takenArtifactIds(live));
-  const references = artifactReferences(
-    await ports.artifacts.list({ types: [ideaType], limit: MAX_OFFERED_IDEAS }),
-  );
   // ONE CONTENT READ PER UNUSED IDEA, and none for an idea already taken: the
   // subtraction happens before the reads, so a list of a hundred ideas of which
   // two are free costs two reads.
   const ideas = [];
   const seen = new Set();
-  for (const reference of references) {
-    if (taken.has(reference.artifactId)) continue;
-    if (seen.has(reference.artifactId)) continue;
+  let cursor = null;
+  for (let pageCount = 0; pageCount < MAX_LISTING_PAGES; pageCount += 1) {
+    const page = await ports.artifacts.list({
+      types: [ideaType],
+      limit: MAX_OFFERED_IDEAS,
+      ...(cursor === null ? {} : { cursor }),
+    });
+    for (const reference of artifactReferences(page)) {
+      if (taken.has(reference.artifactId)) continue;
+      if (seen.has(reference.artifactId)) continue;
+      if (ideas.length >= MAX_OFFERED_IDEAS) break;
+      seen.add(reference.artifactId);
+      const read = await readIdeaText(ports, reference);
+      const body = read ?? "";
+      ideas.push({ ...reference, text: body, title: titleFromIdeaText(body) });
+    }
     if (ideas.length >= MAX_OFFERED_IDEAS) break;
-    seen.add(reference.artifactId);
-    const read = await readIdeaText(ports, reference);
-    const body = read ?? "";
-    ideas.push({ ...reference, text: body, title: titleFromIdeaText(body) });
+    // A page may come back short, even empty, with a mark for the next one, so
+    // the walk ends on a missing mark and never on a short page.
+    if (typeof page?.nextCursor !== "string" || page.nextCursor === "") break;
+    cursor = page.nextCursor;
   }
   if (ideas.length === 0) return { ok: false, ideas: [], reason: EMPTY_LIST_REASON };
   return { ok: true, ideas, reason: "" };
