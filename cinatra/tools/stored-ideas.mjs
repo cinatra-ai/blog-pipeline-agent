@@ -5,9 +5,10 @@
  * admits one generic dispatch on its passthrough, resolves the name a call asks
  * for against the CALLING pack's own manifest, loads the module that manifest
  * declares from this pack's own tree at the pinned lock, and calls the one export
- * the contract names with the ports. So the three steps of the flow — the
- * preparation in front of the gate, the pick, and the completion after the draft
- * is written — are this pack's code, and the runtime keeps no knowledge of a blog
+ * the contract names with the ports. So the four steps of the flow — the
+ * preparation in front of the gate, the pick, the completion after the draft is
+ * written, and the filing of the LinkedIn post's review set — are this pack's
+ * code, and the runtime keeps no knowledge of a blog
  * idea, a reservation or a draft.
  *
  * THIS IS THE SHIPPED ARTIFACT. `cinatra.files` ships `cinatra/`, so the module
@@ -385,9 +386,23 @@ async function complete(input, ports) {
 }
 
 /**
+ * File the LinkedIn post's review set, and nothing else: no row is read or
+ * written and no idea type is needed. The set is handed over whatever it holds —
+ * a missing, empty or unreadable set too — so the host's parser refuses it with
+ * its stated reason rather than a review opening on nothing.
+ */
+async function review(input, ports) {
+  const parsed = parseJsonish(input.reviewTargets);
+  const targets = parsed === null ? input.reviewTargets : parsed;
+  ports.review.file(targets);
+  return { ok: true };
+}
+
+/**
  * THE ONE CALLABLE EXPORT the declared-tools contract pins: one function of one
- * argument, `{ input, ports }`. The three steps of the flow are its three
- * operations, and an operation it does not carry is refused rather than widened.
+ * argument, `{ input, ports }`. The four steps of the flow — the three above and
+ * the filing of the LinkedIn post's review set — are its four operations, and an
+ * operation it does not carry is refused rather than widened.
  */
 export async function extensionTool({ input, ports }) {
   const call = input && typeof input === "object" ? input : {};
@@ -395,9 +410,10 @@ export async function extensionTool({ input, ports }) {
   if (op === "prepare") return prepare(call, ports);
   if (op === "reserve") return reserve(call, ports);
   if (op === "complete") return complete(call, ports);
+  if (op === "review") return review(call, ports);
   throw new IdeaTypeRefusal(
     "invalid-request",
-    "stored_ideas: `op` must be one of prepare, reserve or complete — " +
+    "stored_ideas: `op` must be one of prepare, reserve, complete or review — " +
       `got ${JSON.stringify(call.op)}`,
   );
 }

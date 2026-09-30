@@ -1,4 +1,4 @@
-// Pins the pipeline's terminal LinkedIn binding on the LINKEDIN type. Before
+// Pins the LinkedIn post, written mid-run, on the LINKEDIN type. Before
 // this conversion `linkedinPost` was bound to the blog-post extension, so the
 // pipeline filed its LinkedIn copy as a second blog post — the one mis-targeted
 // binding the plan names.
@@ -16,14 +16,30 @@ const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const end = oas.$referenced_components.end;
 const out = (t) => end.outputs.find((o) => o.title === t);
 
-test("linkedinPost is bound to the LinkedIn post-draft type", () => {
-  assert.deepEqual(out("linkedinPost").cinatra.artifact, {
-    extension: "@cinatra-ai/linkedin-artifacts",
-    objectTypeId: "@cinatra-ai/linkedin:post-draft",
-    contentFrom: "linkedinPost",
-    declaredMime: "text/plain",
-    titleFrom: "linkedinTitle",
-  });
+test("the LinkedIn post is written on the LinkedIn post-draft type", () => {
+  const writes = Object.entries(oas.$referenced_components).filter(
+    ([, n]) =>
+      n &&
+      n.component_type === "ApiNode" &&
+      n.data &&
+      n.data.tool === "artifact_materialize" &&
+      n.data.input.extension === "@cinatra-ai/linkedin-artifacts",
+  );
+  assert.equal(writes.length, 1, "one mid-run write of the LinkedIn post");
+  const [id, write] = writes[0];
+  assert.equal(write.data.input.objectTypeId, "@cinatra-ai/linkedin:post-draft");
+  assert.equal(write.data.input.declaredMime, "text/plain");
+  for (const [input, output] of [
+    ["title", "title"],
+    ["content", "post"],
+  ]) {
+    const edge = oas.data_flow_connections.find(
+      (e) => e.destination_node.$component_ref === id && e.destination_input === input,
+    );
+    assert.ok(edge, `the write's ${input} is edge-sourced`);
+    assert.equal(edge.source_node.$component_ref, "linkedin_flow", "from the LinkedIn writer");
+    assert.equal(edge.source_output, output);
+  }
 });
 
 test("the LinkedIn binding reads a LinkedIn title, not the blog draft's", () => {
