@@ -1,5 +1,6 @@
-// A produces entry is a promise the run keeps. The pipeline files its draft and
-// its LinkedIn post through terminal bindings, so it declares those two. The
+// A produces entry is a promise the run keeps. The pipeline writes its draft and
+// its LinkedIn post mid-run, while the run is still going, so it declares those
+// two. The
 // pictures' road has arrived: the run files its featured image mid-run through
 // the host's image tool, so the blog image is declared beside them. The ideas'
 // entry still waits for its own road, because declaring it before that road is
@@ -52,8 +53,8 @@ test("every declared production has a road that keeps it", () => {
       (n) => n && n.component_type === "ApiNode" && n.data && n.data.tool === "artifact_image_generate",
     )
     .map((n) => n.data.input.extension);
-  assert.deepEqual(bound, ["@cinatra-ai/linkedin-artifacts"]);
-  assert.deepEqual(written, ["@cinatra-ai/blog-post-artifact"]);
+  assert.deepEqual(bound, [], "no production is kept by a terminal binding");
+  assert.deepEqual(written, ["@cinatra-ai/blog-post-artifact", "@cinatra-ai/linkedin-artifacts"]);
   assert.deepEqual(filed, ["@cinatra-ai/blog-image-artifact"]);
   assert.deepEqual(
     [...bound, ...written, ...filed].sort(),

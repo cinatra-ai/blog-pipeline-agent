@@ -83,15 +83,6 @@
     {
       "title": "linkedinPost",
       "type": "string",
-      "cinatra": {
-        "artifact": {
-          "extension": "@cinatra-ai/linkedin-artifacts",
-          "objectTypeId": "@cinatra-ai/linkedin:post-draft",
-          "contentFrom": "linkedinPost",
-          "declaredMime": "text/plain",
-          "titleFrom": "linkedinTitle"
-        }
-      },
       "default": ""
     },
     {
@@ -145,6 +136,12 @@
     },
     {
       "$component_ref": "linkedin_flow"
+    },
+    {
+      "$component_ref": "write_linkedin"
+    },
+    {
+      "$component_ref": "gather_linkedin_review"
     },
     {
       "$component_ref": "linkedin_review_gate"
@@ -338,12 +335,40 @@
     },
     {
       "component_type": "ControlFlowEdge",
-      "id": "linkedin_flow->linkedin_review_gate",
-      "name": "linkedin_flow->linkedin_review_gate",
+      "id": "linkedin_flow->write_linkedin",
+      "name": "linkedin_flow->write_linkedin",
       "description": "",
       "metadata": {},
       "from_node": {
         "$component_ref": "linkedin_flow"
+      },
+      "from_branch": null,
+      "to_node": {
+        "$component_ref": "write_linkedin"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "write_linkedin->gather_linkedin_review",
+      "name": "write_linkedin->gather_linkedin_review",
+      "description": "",
+      "metadata": {},
+      "from_node": {
+        "$component_ref": "write_linkedin"
+      },
+      "from_branch": null,
+      "to_node": {
+        "$component_ref": "gather_linkedin_review"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "gather_linkedin_review->linkedin_review_gate",
+      "name": "gather_linkedin_review->linkedin_review_gate",
+      "description": "",
+      "metadata": {},
+      "from_node": {
+        "$component_ref": "gather_linkedin_review"
       },
       "from_branch": null,
       "to_node": {
@@ -1025,6 +1050,111 @@
         "$component_ref": "linkedin_review_gate"
       },
       "destination_input": "linkedinTitle"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "post:linkedin_flow->write_linkedin.content",
+      "name": "post:linkedin_flow->write_linkedin",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "linkedin_flow"
+      },
+      "source_output": "post",
+      "destination_node": {
+        "$component_ref": "write_linkedin"
+      },
+      "destination_input": "content"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "title:linkedin_flow->write_linkedin.title",
+      "name": "title:linkedin_flow->write_linkedin",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "linkedin_flow"
+      },
+      "source_output": "title",
+      "destination_node": {
+        "$component_ref": "write_linkedin"
+      },
+      "destination_input": "title"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "cinatra_run_id:start->write_linkedin.cinatra_run_id",
+      "name": "cinatra_run_id:start->write_linkedin",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "cinatra_run_id",
+      "destination_node": {
+        "$component_ref": "write_linkedin"
+      },
+      "destination_input": "cinatra_run_id"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "artifactId:write_linkedin->gather_linkedin_review.linkedinArtifactId",
+      "name": "artifactId:write_linkedin->gather_linkedin_review",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "write_linkedin"
+      },
+      "source_output": "artifactId",
+      "destination_node": {
+        "$component_ref": "gather_linkedin_review"
+      },
+      "destination_input": "linkedinArtifactId"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "representationRevisionId:write_linkedin->gather_linkedin_review.linkedinRevisionId",
+      "name": "representationRevisionId:write_linkedin->gather_linkedin_review",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "write_linkedin"
+      },
+      "source_output": "representationRevisionId",
+      "destination_node": {
+        "$component_ref": "gather_linkedin_review"
+      },
+      "destination_input": "linkedinRevisionId"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "cinatra_run_id:start->gather_linkedin_review.cinatra_run_id",
+      "name": "cinatra_run_id:start->gather_linkedin_review",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "cinatra_run_id",
+      "destination_node": {
+        "$component_ref": "gather_linkedin_review"
+      },
+      "destination_input": "cinatra_run_id"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "reviewTargets:gather_linkedin_review->linkedin_review_gate.reviewTargets",
+      "name": "reviewTargets:gather_linkedin_review->linkedin_review_gate",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "gather_linkedin_review"
+      },
+      "source_output": "reviewTargets",
+      "destination_node": {
+        "$component_ref": "linkedin_review_gate"
+      },
+      "destination_input": "reviewTargets"
     },
     {
       "component_type": "DataFlowEdge",
@@ -4692,6 +4822,117 @@
         }
       }
     },
+    "write_linkedin": {
+      "component_type": "ApiNode",
+      "id": "write_linkedin",
+      "name": "Write the LinkedIn post as this run's post draft",
+      "url": "{{CINATRA_BASE_URL}}/api/agents/passthrough",
+      "http_method": "POST",
+      "data": {
+        "tool": "artifact_materialize",
+        "input": {
+          "extension": "@cinatra-ai/linkedin-artifacts",
+          "objectTypeId": "@cinatra-ai/linkedin:post-draft",
+          "declaredMime": "text/plain",
+          "title": "{{ title }}",
+          "content": "{{ content }}",
+          "node_id": "write_linkedin"
+        },
+        "agent_run_id": "{{ cinatra_run_id }}"
+      },
+      "inputs": [
+        {
+          "title": "title",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "content",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "cinatra_run_id",
+          "type": "string",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "artifactId",
+          "type": "string"
+        },
+        {
+          "title": "representationRevisionId",
+          "type": "string"
+        }
+      ],
+      "metadata": {
+        "cinatra": {
+          "riskClass": "write",
+          "requiresApproval": false,
+          "packageName": "@cinatra-ai/blog-pipeline-agent",
+          "description": "The LinkedIn post the writer made is written here as a LinkedIn post draft while the run is still going, so the review that follows opens on an immutable revision of the real post instead of on loose text. The reference it returns is what the next step hands the review."
+        }
+      }
+    },
+    "gather_linkedin_review": {
+      "component_type": "ApiNode",
+      "id": "gather_linkedin_review",
+      "name": "Gather the LinkedIn post's review target",
+      "url": "{{CINATRA_BASE_URL}}/api/agents/passthrough",
+      "http_method": "POST",
+      "data": {
+        "tool": "extension_tool",
+        "input": {
+          "name": "stored_ideas",
+          "input": {
+            "op": "review",
+            "reviewTargets": "[{\"artifactId\": \"{{ linkedinArtifactId }}\", \"representationRevisionId\": \"{{ linkedinRevisionId }}\"}]"
+          }
+        },
+        "agent_run_id": "{{ cinatra_run_id }}",
+        "result_input_passthrough": true,
+        "result_id_field": "ok"
+      },
+      "inputs": [
+        {
+          "title": "linkedinArtifactId",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "linkedinRevisionId",
+          "type": "string",
+          "default": ""
+        },
+        {
+          "title": "cinatra_run_id",
+          "type": "string",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "reviewTargets",
+          "type": "string",
+          "default": "[]"
+        },
+        {
+          "title": "ok",
+          "type": "boolean",
+          "default": false
+        }
+      ],
+      "metadata": {
+        "cinatra": {
+          "riskClass": "write",
+          "requiresApproval": false,
+          "packageName": "@cinatra-ai/blog-pipeline-agent",
+          "description": "The projection step of the LinkedIn post's review: the call files the immutable reference the write before returned, and the host answers with the set it validated, so that set reaches the review step as the input the marker below names. The set names the LinkedIn post alone; the call writes no row and answers with its own ok flag."
+        }
+      }
+    },
     "linkedin_review_gate": {
       "component_type": "InputMessageNode",
       "id": "linkedin_review_gate",
@@ -4714,7 +4955,10 @@
               "linkedinPost"
             ]
           },
-          "description": "The last pause of plan (C) section 6.1 step 5: the LinkedIn post the writer made from the revision the person continued with, held for that person to approve before the run ends and the post is filed as a LinkedIn post-draft. The publishing steps are their own agents and are not in this flow."
+          "description": "The last pause of plan (C) section 6.1 step 5: the review of the LinkedIn post the writer made from the revision the person continued with. The post is written as a LinkedIn post draft before this step, and the marker below names the input its reference travels in, so the review core pins exactly that revision and opens its review while the run parks here. The decision is the lifecycle's, not this flow's: this flow owns the pause. The publishing steps are their own agents and are not in this flow.",
+          "artifactReview": {
+            "targetsInput": "reviewTargets"
+          }
         }
       },
       "inputs": [
@@ -4727,6 +4971,11 @@
           "title": "linkedinTitle",
           "type": "string",
           "default": ""
+        },
+        {
+          "title": "reviewTargets",
+          "type": "string",
+          "default": "[]"
         }
       ],
       "outputs": [
@@ -4744,15 +4993,6 @@
         {
           "title": "linkedinPost",
           "type": "string",
-          "cinatra": {
-            "artifact": {
-              "extension": "@cinatra-ai/linkedin-artifacts",
-              "objectTypeId": "@cinatra-ai/linkedin:post-draft",
-              "contentFrom": "linkedinPost",
-              "declaredMime": "text/plain",
-              "titleFrom": "linkedinTitle"
-            }
-          },
           "default": ""
         },
         {

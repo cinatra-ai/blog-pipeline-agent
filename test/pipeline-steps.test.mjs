@@ -235,14 +235,22 @@ test("the pick is reserved, and the reserved idea's own words are what the draft
 
 test("the draft is written while the run is still going, as a blog-post artifact", () => {
   const writes = toolNodes("artifact_materialize");
-  assert.equal(writes.length, 1, "one mid-run write, and it is the draft's");
-  const node = parts[writes[0]];
+  assert.equal(writes.length, 2, "two mid-run writes: the draft's, then the LinkedIn post's");
+  assert.deepEqual(
+    writes.map((id) => parts[id].data.input.extension),
+    ["@cinatra-ai/blog-post-artifact", "@cinatra-ai/linkedin-artifacts"],
+    "the draft's write comes first and the LinkedIn post's second",
+  );
+  const write = writes.find(
+    (id) => parts[id].data.input.extension === "@cinatra-ai/blog-post-artifact",
+  );
+  const node = parts[write];
   assert.equal(node.data.input.extension, "@cinatra-ai/blog-post-artifact");
   assert.equal(node.data.input.objectTypeId, "@cinatra-ai/blog-post-artifact:post");
   assert.equal(node.data.input.declaredMime, "text/markdown");
-  assert.ok(at("draft_flow") < at(writes[0]), "it writes what the draft writer wrote");
-  assert.equal(edgeInto(writes[0], "content").source_node.$component_ref, "draft_flow");
-  assert.equal(edgeInto(writes[0], "title").source_node.$component_ref, "draft_flow");
+  assert.ok(at("draft_flow") < at(write), "it writes what the draft writer wrote");
+  assert.equal(edgeInto(write, "content").source_node.$component_ref, "draft_flow");
+  assert.equal(edgeInto(write, "title").source_node.$component_ref, "draft_flow");
   const returned = node.outputs.map((o) => o.title).sort();
   assert.deepEqual(returned, ["artifactId", "representationRevisionId"]);
 });
@@ -306,9 +314,9 @@ test("the picture is made before anyone reviews anything", () => {
 // 6. "The end node binds the LinkedIn post only." (8.4)
 // ---------------------------------------------------------------------------
 
-test("the end node binds the LinkedIn post and nothing else", () => {
+test("the end node binds nothing: everything the run makes is written while it runs", () => {
   const bound = parts.end.outputs.filter((o) => o.cinatra?.artifact).map((o) => o.title);
-  assert.deepEqual(bound, ["linkedinPost"]);
+  assert.deepEqual(bound, [], "no end output carries a binding");
   const titles = parts.end.outputs.map((o) => o.title).sort();
   for (const retired of ["draft", "draftTitle", "draftContent", "imagePrompts", "ideas"]) {
     assert.ok(!titles.includes(retired), `${retired} is written during the run, not bound at the end`);
