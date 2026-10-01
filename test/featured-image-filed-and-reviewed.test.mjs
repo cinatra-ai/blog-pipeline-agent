@@ -2,11 +2,11 @@
 // cinatra#3035.
 //
 // These cases pin five things on the flow definition and the manifest: one step
-// of the run files the featured image through the host's image tool as a blog
+// of the run files the featured image through the host's image tool as an
 // image; it runs after the picture is settled and before the review; it carries
 // the picture's prompt, the post it belongs to, its placement and its
 // alternative text; the review's target set names the post first and the
-// picture second; and the blog image is a declared production of both the
+// picture second; and the image is a declared production of both the
 // manifest and the flow.
 //
 // Read the flow, never a copy of it: the file this suite reads is the file the
@@ -30,8 +30,8 @@ const POST = {
   objectTypeId: "@cinatra-ai/blog-post-artifact:post",
 };
 const IMAGE = {
-  extension: "@cinatra-ai/blog-image-artifact",
-  objectTypeId: "@cinatra-ai/blog-image-artifact:blog-image",
+  extension: "@cinatra-ai/image-artifact",
+  objectTypeId: "@cinatra-ai/image-artifact:image",
 };
 const LINKEDIN = {
   extension: "@cinatra-ai/linkedin-artifacts",
@@ -100,8 +100,8 @@ test("the run files its featured image through the host's image tool", () => {
   const node = parts[id];
   assert.equal(node.url, PASSTHROUGH_URL, "the step calls the host's passthrough");
   assert.equal(node.http_method, "POST");
-  assert.equal(node.data.input.extension, IMAGE.extension, "it files a blog image");
-  assert.equal(node.data.input.objectTypeId, IMAGE.objectTypeId, "of the blog image type");
+  assert.equal(node.data.input.extension, IMAGE.extension, "it files an image");
+  assert.equal(node.data.input.objectTypeId, IMAGE.objectTypeId, "of the image type");
   assert.equal(node.data.input.node_id, id, "the call names the step that makes it");
   assert.equal(node.metadata.cinatra.riskClass, "write", "filing a picture is a write");
 });
