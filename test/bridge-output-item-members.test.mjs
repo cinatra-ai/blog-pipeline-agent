@@ -183,7 +183,7 @@ test("the embedded draft writer emits the declared fields its consumers read, no
 test("the featured image the flow settles declares the members the image artifact stores", () => {
   // `prompts` was the free-form list of #56 (the flow at f8971d50, oas.json:3835);
   // the flow settles the picture through the image generator instead, whose
-  // `image` output declares the fields @cinatra-ai/blog-image-artifact stores.
+  // `image` output declares the fields the image artifact carries as its data.
   const image = output("blog-image-generator-agent__generate", "image");
   assert.ok(image, "the flow carries the embedded featured-image bridge node");
   assert.deepEqual(Object.keys(image.json_schema.properties).sort(), [

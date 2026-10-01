@@ -2,7 +2,7 @@
 // its LinkedIn post mid-run, while the run is still going, so it declares those
 // two. The
 // pictures' road has arrived: the run files its featured image mid-run through
-// the host's image tool, so the blog image is declared beside them. The ideas'
+// the host's image tool, so the image is declared beside them. The ideas'
 // entry still waits for its own road, because declaring it before that road is
 // built would be a promise nothing keeps.
 
@@ -22,8 +22,8 @@ const KEPT = [
     objectTypeId: "@cinatra-ai/blog-post-artifact:post",
   },
   {
-    extension: "@cinatra-ai/blog-image-artifact",
-    objectTypeId: "@cinatra-ai/blog-image-artifact:blog-image",
+    extension: "@cinatra-ai/image-artifact",
+    objectTypeId: "@cinatra-ai/image-artifact:image",
   },
   {
     extension: "@cinatra-ai/linkedin-artifacts",
@@ -55,7 +55,7 @@ test("every declared production has a road that keeps it", () => {
     .map((n) => n.data.input.extension);
   assert.deepEqual(bound, [], "no production is kept by a terminal binding");
   assert.deepEqual(written, ["@cinatra-ai/blog-post-artifact", "@cinatra-ai/linkedin-artifacts"]);
-  assert.deepEqual(filed, ["@cinatra-ai/blog-image-artifact"]);
+  assert.deepEqual(filed, ["@cinatra-ai/image-artifact"]);
   assert.deepEqual(
     [...bound, ...written, ...filed].sort(),
     KEPT.map((p) => p.extension).sort(),
@@ -69,8 +69,8 @@ test("the four dependency edges stay — they say what the run touches", () => {
     .sort();
   assert.deepEqual(names, [
     "@cinatra-ai/blog-idea-artifact",
-    "@cinatra-ai/blog-image-artifact",
     "@cinatra-ai/blog-post-artifact",
+    "@cinatra-ai/image-artifact",
     "@cinatra-ai/linkedin-artifacts",
   ]);
 });

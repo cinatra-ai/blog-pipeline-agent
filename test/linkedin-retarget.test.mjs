@@ -91,8 +91,8 @@ test("the four artifact dependency edges are declared", () => {
     .sort();
   assert.deepEqual(names, [
     "@cinatra-ai/blog-idea-artifact",
-    "@cinatra-ai/blog-image-artifact",
     "@cinatra-ai/blog-post-artifact",
+    "@cinatra-ai/image-artifact",
     "@cinatra-ai/linkedin-artifacts",
   ]);
 });

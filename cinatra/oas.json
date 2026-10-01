@@ -17,8 +17,8 @@
           "objectTypeId": "@cinatra-ai/blog-post-artifact:post"
         },
         {
-          "extension": "@cinatra-ai/blog-image-artifact",
-          "objectTypeId": "@cinatra-ai/blog-image-artifact:blog-image"
+          "extension": "@cinatra-ai/image-artifact",
+          "objectTypeId": "@cinatra-ai/image-artifact:image"
         },
         {
           "extension": "@cinatra-ai/linkedin-artifacts",
@@ -4200,8 +4200,8 @@
       "data": {
         "tool": "artifact_image_generate",
         "input": {
-          "extension": "@cinatra-ai/blog-image-artifact",
-          "objectTypeId": "@cinatra-ai/blog-image-artifact:blog-image",
+          "extension": "@cinatra-ai/image-artifact",
+          "objectTypeId": "@cinatra-ai/image-artifact:image",
           "title": "{{ title }}",
           "prompt": "{# pyagentspec-input-hint (do not remove): {{ image }} #}{{ image.prompt }}",
           "dataJson": "{# pyagentspec-input-hint (do not remove): {{ image }} {{ postArtifactId }} #}{\"post\":{{ postArtifactId | tojson }},\"placement\":\"featured\",\"altText\":{{ image.altText | tojson }}}",
@@ -4271,7 +4271,7 @@
           "riskClass": "write",
           "requiresApproval": false,
           "packageName": "@cinatra-ai/blog-pipeline-agent",
-          "description": "The featured image the step before settled is filed here as a blog image through the host's image tool, named after the post and carrying the post it belongs to, its placement and its alternative text. The reference it returns is what the review's target set names second."
+          "description": "The featured image the step before settled is filed here as an image through the host's image tool, named after the post and carrying the post it belongs to, its placement and its alternative text. The reference it returns is what the review's target set names second."
         }
       }
     },

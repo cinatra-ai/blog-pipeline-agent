@@ -86,7 +86,7 @@
         "kind": "artifact"
       },
       {
-        "packageName": "@cinatra-ai/blog-image-artifact",
+        "packageName": "@cinatra-ai/image-artifact",
         "edgeType": "runtime",
         "versionConstraint": {
           "kind": "semver-range",
@@ -139,8 +139,8 @@
         "objectTypeId": "@cinatra-ai/blog-post-artifact:post"
       },
       {
-        "extension": "@cinatra-ai/blog-image-artifact",
-        "objectTypeId": "@cinatra-ai/blog-image-artifact:blog-image"
+        "extension": "@cinatra-ai/image-artifact",
+        "objectTypeId": "@cinatra-ai/image-artifact:image"
       },
       {
         "extension": "@cinatra-ai/linkedin-artifacts",
