@@ -428,8 +428,6 @@ test("the pipeline declares the idea-to-draft relation table it writes", () => {
     "idea_revision_id",
     "org_id",
     "run_id",
-    "scope_id",
-    "scope_kind",
     "state",
   ]);
   const org = relation.columns.find((c) => c.name === "org_id");

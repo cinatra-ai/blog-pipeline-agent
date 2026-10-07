@@ -158,8 +158,6 @@
         "name": "idea_drafts",
         "organizationColumn": "org_id",
         "runColumn": "run_id",
-        "scopeKindColumn": "scope_kind",
-        "scopeIdColumn": "scope_id",
         "columns": [
           {
             "name": "org_id",
@@ -168,16 +166,6 @@
           },
           {
             "name": "run_id",
-            "type": "text",
-            "notNull": true
-          },
-          {
-            "name": "scope_kind",
-            "type": "text",
-            "notNull": true
-          },
-          {
-            "name": "scope_id",
             "type": "text",
             "notNull": true
           },
@@ -224,14 +212,6 @@
             "columns": [
               "org_id",
               "run_id"
-            ]
-          },
-          {
-            "name": "idea_drafts_by_scope",
-            "columns": [
-              "org_id",
-              "scope_kind",
-              "scope_id"
             ]
           }
         ]

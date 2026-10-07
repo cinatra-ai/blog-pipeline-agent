@@ -17,24 +17,25 @@
  * states, and `test/stored-ideas-tool-module.test.mjs` pins the sentences a
  * person reads against that module so the two cannot drift apart.
  *
- * NEITHER THE RUN NOR THE SCOPE IS EVER IN THIS FILE. The ports are already
- * bound: the host writes the organisation, the run and the scope on a write, and
- * a read asks for this run's own rows with `{ boundRun: true }` on the declared
- * run column and for this scope's own rows with `{ boundScope: true }` on the
- * declared scope columns. A literal on one of those columns is refused at the
- * seam, and no run id and no scope id appears anywhere in this pack.
+ * THE RUN IS NEVER IN THIS FILE. The ports are already bound: the host writes
+ * the organisation and the run on a write and narrows every statement to the
+ * organisation, and a read asks for this run's own rows with `{ boundRun: true }`
+ * on the declared run column. A literal on either column is refused at the seam,
+ * and no run id appears anywhere in this pack.
+ *
+ * THE RESERVATIONS ARE THE ORGANISATION'S. The offer lists every stored idea of
+ * the organisation and the table's one-live-row-per-idea rule is
+ * organisation-wide, so the table binds no launch scope: a run launched from any
+ * page, from a schedule or from another agent reads and takes the same list.
  */
 
 /** The reservation table, as this pack's manifest declares it. */
 const TABLE = "idea_drafts";
-/** The host-bound columns of that table, named here only to ask for "mine". */
+/** The host-bound run column of that table, named here only to ask for "mine". */
 const RUN_COLUMN = "run_id";
-const SCOPE_KIND_COLUMN = "scope_kind";
-const SCOPE_ID_COLUMN = "scope_id";
-/** The two markers the data contract defines, and the only values those columns
- *  take in a request. */
+/** The marker the data contract defines, and the only value that column takes in
+ *  a request. */
 const BOUND_RUN = Object.freeze({ boundRun: true });
-const BOUND_SCOPE = Object.freeze({ boundScope: true });
 
 /** A row is live — it takes its idea off the list — until it is released. */
 const RESERVED = "reserved";
@@ -112,18 +113,13 @@ function titleFromIdeaText(value) {
   return firstLine.replace(/^title\s*:\s*/i, "").trim();
 }
 
-/** This scope's own rows, asked for the one way the data contract admits. */
-function scopeWhere() {
-  return { [SCOPE_KIND_COLUMN]: BOUND_SCOPE, [SCOPE_ID_COLUMN]: BOUND_SCOPE };
-}
-
-/** The reservation rows of the scope this run belongs to. NOT this run's alone:
- *  a reservation a sibling run took is exactly what this run must not take
- *  again, so the run column is not named here. */
+/** The reservation rows of the organisation, which the host narrows every
+ *  statement to. NOT this run's alone: a reservation another run took is exactly
+ *  what this run must not take again, so the run column is not named here. */
 async function selectRelationRows(ports) {
   const answer = await ports.data.select({
     table: TABLE,
-    where: { ...scopeWhere() },
+    where: {},
     limit: 1000,
   });
   const rows = answer && Array.isArray(answer.rows) ? answer.rows : [];
@@ -183,7 +179,7 @@ async function releaseExpiredReservations(ports, rows, now) {
     const written = await ports.data.updateWhere({
       table: TABLE,
       set: { state: RELEASED, expires_at: null },
-      where: { idea_artifact_id: ideaArtifactId, state: RESERVED, ...scopeWhere() },
+      where: { idea_artifact_id: ideaArtifactId, state: RESERVED },
     });
     if ((written?.updated ?? 0) > 0) released.add(row);
   }
@@ -337,8 +333,8 @@ function resolveIdeaPick(pick, offered) {
  * lands or is refused by the table's own one-live-row-per-idea rule, so two runs
  * that offer the same idea at the same moment cannot both take it, however close
  * their picks are. The loser is told the idea was just taken; nothing is silently
- * re-picked for them. The organisation, the run and the scope are none of this
- * write's business — the host stamps all three.
+ * re-picked for them. The organisation and the run are none of this write's
+ * business — the host stamps both.
  */
 async function reserve(input, ports) {
   requireIdeaType(input);
@@ -387,7 +383,7 @@ async function complete(input, ports) {
   const written = await ports.data.updateWhere({
     table: TABLE,
     set: { state: DRAFTED, draft_artifact_id: draftArtifactId, expires_at: null },
-    where: { idea_artifact_id: ideaArtifactId, [RUN_COLUMN]: BOUND_RUN, ...scopeWhere() },
+    where: { idea_artifact_id: ideaArtifactId, [RUN_COLUMN]: BOUND_RUN },
   });
   // THE FILING IS THE HOST'S TO VALIDATE. A set this module cannot read is
   // handed over as it arrived, so a malformed filing is refused with a stated

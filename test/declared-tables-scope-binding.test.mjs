@@ -3,22 +3,27 @@
  * states for a declaration it reads.
  *
  * The generic dispatch hands a declared module ports that are already bound: the
- * organisation, the RUN a row belongs to, and the SCOPE that run was launched
- * from. A module therefore never holds a run identity or a scope identity — but
- * the host can only bind what the declaration names, so the binding is declared
- * here:
+ * organisation every statement stands inside, and the RUN a row belongs to. A
+ * module therefore never holds a run identity — but the host can only bind what
+ * the declaration names, so the binding is declared here:
  *
- *   - `runColumn` names the column carrying the run a row belongs to;
- *   - `scopeKindColumn` and `scopeIdColumn` are declared as a PAIR — a kind
- *     names no scope without an id, and an id names no vocabulary without a
- *     kind;
- *   - every one of them names one of the table's OWN declared columns, is not
- *     the organisation column, carries one binding each (no column stands for
- *     two), and is declared `notNull: true` — a nullable binding is a row
- *     belonging to no run and no scope.
+ *   - `organizationColumn` names the column the host writes and narrows every
+ *     statement to;
+ *   - `runColumn` names the column carrying the run a row belongs to; it names
+ *     one of the table's OWN declared columns, is not the organisation column,
+ *     and is declared `notNull: true` — a nullable binding is a row belonging to
+ *     no run.
  *
- * Those rules are RE-STATED here as the host's own parser states them, so this
- * pack is checked by the same rules rather than by a copy of the host's parser: a
+ * THE TABLE DECLARES NO SCOPE PAIR. The offer lists every stored idea of the
+ * organisation, and the table's one-live-row-per-idea rule is organisation-wide,
+ * so a reservation belongs to the organisation and not to the place a run was
+ * launched from. A scope pair would bind every read and write to the launch
+ * scope the run recorded: a run launched with none would be refused outright,
+ * and a run launched from one scope would offer again, and could draft again,
+ * an idea reserved or drafted from another.
+ *
+ * The host's rule is RE-STATED here as its own parser states it, so this pack is
+ * checked by the same rule rather than by a copy of the host's parser: a
  * declaration that would be refused at the seam is refused here first.
  *
  *   node --test test/declared-tables-scope-binding.test.mjs
@@ -34,6 +39,8 @@ const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 
 /** The reservation table, as this pack declares it and the module names it. */
 const TABLE = "idea_drafts";
+/** The two columns a scope binding would name, and the index over them. */
+const SCOPE_COLUMNS = ["scope_kind", "scope_id"];
 
 function table() {
   const tables = manifest.cinatra.declaredTables;
@@ -45,8 +52,8 @@ function table() {
 
 /**
  * Why one host-bound column declaration would be refused, or null when it is
- * admitted — the rule the host's own declared-tables parser applies to each of
- * `runColumn`, `scopeKindColumn` and `scopeIdColumn`.
+ * admitted — the rule the host's own declared-tables parser applies to a bound
+ * column such as `runColumn`.
  */
 function boundColumnIssue(entry, field, takenBy) {
   const raw = entry[field];
@@ -63,55 +70,55 @@ function boundColumnIssue(entry, field, takenBy) {
   if (already) return `${field} is already the ${already} column`;
   const column = columns.find((c) => c && c.name === raw);
   if (!column || column.notNull !== true) {
-    return `the ${field} column must be declared \`notNull: true\``;
+    return `the ${field} column must be declared notNull: true`;
   }
   takenBy.set(raw, field);
   return null;
 }
 
-/** Why the scope pair would be refused: one half without the other names no
- *  scope the host could write. */
-function scopePairIssue(entry) {
-  const kind = entry.scopeKindColumn ?? null;
-  const id = entry.scopeIdColumn ?? null;
-  if ((kind === null) !== (id === null)) {
-    return "the scope binding is declared as a PAIR";
-  }
-  return null;
-}
-
-test("the reservation table declares its run column and its scope pair", () => {
+test("the reservation table binds the organisation and the run, and declares no scope pair", () => {
   const entry = table();
+  assert.equal(entry.organizationColumn, "org_id", "the organisation every statement stands inside");
   assert.equal(entry.runColumn, "run_id", "the run a row belongs to");
-  assert.equal(entry.scopeKindColumn, "scope_kind", "the kind of scope that run belongs to");
-  assert.equal(entry.scopeIdColumn, "scope_id", "the id inside that kind");
+  assert.equal(
+    Object.hasOwn(entry, "scopeKindColumn"),
+    false,
+    "no scope kind binding: a reservation belongs to the organisation, not to a launch scope",
+  );
+  assert.equal(
+    Object.hasOwn(entry, "scopeIdColumn"),
+    false,
+    "no scope id binding: a run launched with no scope reads and takes the same list",
+  );
 });
 
-test("the two scope columns are declared, notNull and text", () => {
+test("the table declares no scope column and no index over one", () => {
   const entry = table();
-  for (const name of ["scope_kind", "scope_id"]) {
-    const column = entry.columns.find((c) => c && c.name === name);
-    assert.ok(column, `the table declares the column "${name}"`);
-    assert.equal(column.type, "text", `"${name}" is text`);
-    assert.equal(column.notNull, true, `"${name}" is notNull — a nullable scope is no scope`);
+  const names = entry.columns.map((c) => c && c.name);
+  for (const name of SCOPE_COLUMNS) {
+    assert.ok(!names.includes(name), `the table declares no column "${name}"`);
+  }
+  const indexes = Array.isArray(entry.indexes) ? entry.indexes : [];
+  for (const index of indexes) {
+    for (const column of index.columns) {
+      assert.ok(!SCOPE_COLUMNS.includes(column), `index "${index.name}" names no scope column`);
+    }
   }
 });
 
-test("each binding is admitted by the host's own rule, refusal by refusal", () => {
+test("the run binding is admitted by the host's own rule, refusal by refusal", () => {
   const entry = table();
-  const takenBy = new Map();
-  assert.equal(boundColumnIssue(entry, "runColumn", takenBy), null);
-  assert.equal(boundColumnIssue(entry, "scopeKindColumn", takenBy), null);
-  assert.equal(boundColumnIssue(entry, "scopeIdColumn", takenBy), null);
-  assert.equal(scopePairIssue(entry), null);
+  assert.equal(boundColumnIssue(entry, "runColumn", new Map()), null);
+  const run = entry.columns.find((c) => c && c.name === "run_id");
+  assert.equal(run.type, "text", "the run column is text");
+  assert.equal(run.notNull, true, "the run column is notNull — a nullable run is no run");
 
-  // The same cases the host's parser states. Without them the checks above could
+  // The same cases the host's parser states. Without them the check above could
   // pass against a rule this pack invented.
   const columns = [
     { name: "org_id", type: "text", notNull: true },
     { name: "run_id", type: "text", notNull: true },
-    { name: "scope_kind", type: "text", notNull: true },
-    { name: "scope_id", type: "text" },
+    { name: "loose_id", type: "text" },
   ];
   const base = { name: TABLE, organizationColumn: "org_id", columns };
   assert.match(
@@ -123,20 +130,12 @@ test("each binding is admitted by the host's own rule, refusal by refusal", () =
     /already the organisation column/,
   );
   assert.match(
-    boundColumnIssue({ ...base, scopeIdColumn: "scope_id" }, "scopeIdColumn", new Map()),
+    boundColumnIssue({ ...base, runColumn: "loose_id" }, "runColumn", new Map()),
     /must be declared/,
   );
-  const shared = new Map();
-  assert.equal(boundColumnIssue({ ...base, runColumn: "run_id" }, "runColumn", shared), null);
-  assert.match(
-    boundColumnIssue({ ...base, scopeKindColumn: "run_id" }, "scopeKindColumn", shared),
-    /already the runColumn column/,
-  );
-  assert.match(scopePairIssue({ ...base, scopeKindColumn: "scope_kind" }), /declared as a PAIR/);
-  assert.match(scopePairIssue({ ...base, scopeIdColumn: "scope_kind" }), /declared as a PAIR/);
 });
 
-test("the unique reservation rule still arbitrates the race, and the scope has its own index", () => {
+test("the unique reservation rule arbitrates the race across the organisation", () => {
   const entry = table();
   const indexes = Array.isArray(entry.indexes) ? entry.indexes : [];
   const unique = indexes.find((i) => i && i.unique === true);
@@ -144,13 +143,13 @@ test("the unique reservation rule still arbitrates the race, and the scope has i
   assert.deepEqual(
     unique.columns,
     ["org_id", "idea_artifact_id", "state"],
-    "one live row per idea — the rule of which two runs offering one idea only one takes it",
+    "one live row per idea in the organisation — of two runs offering one idea only one takes it",
   );
-  const byScope = indexes.find(
-    (i) => i && !i.unique && Array.isArray(i.columns) && i.columns.includes("scope_kind"),
+  assert.deepEqual(
+    indexes.map((i) => i.name),
+    ["idea_drafts_one_live", "idea_drafts_by_run"],
+    "the reservation index and the by-run index, and no other",
   );
-  assert.ok(byScope, "the table carries a by-scope index");
-  assert.deepEqual(byScope.columns, ["org_id", "scope_kind", "scope_id"]);
   for (const index of indexes) {
     for (const column of index.columns) {
       assert.ok(
