@@ -8,16 +8,22 @@
  * filing and the clock. So the module is the pack's, and everything the three
  * flow steps do is provable here without a database.
  *
- * THE FAKE PORTS REFUSE WHAT THE HOST REFUSES. The organisation, the run and the
- * scope are the host's to write: a request naming one of those columns is refused
- * here exactly as the data contract refuses it, and a module asks for this run's
- * or this scope's own rows with the two markers instead — `{ boundRun: true }`
- * and `{ boundScope: true }`. So "no run id and no scope id appears anywhere in
- * the pack's code or tool input" is a test and not a reading of the diff.
+ * THE FAKE PORTS REFUSE WHAT THE HOST REFUSES. The organisation and the run are
+ * the host's to write: a request naming one of those columns is refused here
+ * exactly as the data contract refuses it, and a module asks for this run's own
+ * rows with the marker `{ boundRun: true }` instead. The reservation table binds
+ * no scope, so a scope marker is refused as the host refuses it on a table that
+ * declares no scope column. So "no run id appears anywhere in the pack's code or
+ * tool input" is a test and not a reading of the diff.
+ *
+ * A RUN LAUNCHED WITH NO SCOPE (from the agents page, a schedule or another
+ * agent) carries no launch scope, and the host refuses `no-scope` rather than
+ * stamp one. Its own suite below runs every operation for such a run.
  *
  *   node --test test/stored-ideas-tool-module.test.mjs
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { extensionTool } from "../cinatra/tools/stored-ideas.mjs";
@@ -32,10 +38,8 @@ const TABLE = "idea_drafts";
 const IDEA_TYPE = "@cinatra-ai/blog-idea-artifact:blog-idea";
 const ORG_COLUMN = "org_id";
 const RUN_COLUMN = "run_id";
-const SCOPE_COLUMNS = ["scope_kind", "scope_id"];
-/** What the HOST would bind. Nothing below hands either of them to the module. */
+/** What the HOST would bind. Nothing below hands it to the module. */
 const BOUND_RUN = "run-under-test";
-const BOUND_SCOPE = { kind: "workspace", scope_id: "scope-under-test" };
 
 const IDEA_A = {
   artifactId: "idea-a",
@@ -59,20 +63,20 @@ function isMarker(value, key) {
 }
 
 /** The host's own refusals over one data request, applied to every call the
- *  module makes: the bound columns are never named, and a marker stands only on
- *  the column whose binding it asks for. */
+ *  module makes: the bound columns are never named, the run marker stands only on
+ *  the run column, and no scope marker stands anywhere — the table binds none. */
 function assertBoundColumnsAreTheHosts(request) {
   for (const field of ["row", "set", "expect", "values"]) {
     for (const key of Object.keys(request[field] ?? {})) {
       assert.ok(
-        key !== ORG_COLUMN && key !== RUN_COLUMN && !SCOPE_COLUMNS.includes(key),
+        key !== ORG_COLUMN && key !== RUN_COLUMN,
         `the module writes no bound column — "${key}" (${field}) is the host's`,
       );
     }
   }
   for (const key of request.conflictKeys ?? []) {
     assert.ok(
-      key !== ORG_COLUMN && key !== RUN_COLUMN && !SCOPE_COLUMNS.includes(key),
+      key !== ORG_COLUMN && key !== RUN_COLUMN,
       `a conflict key names no bound column — "${key}" is the host's`,
     );
   }
@@ -85,32 +89,25 @@ function assertBoundColumnsAreTheHosts(request) {
       );
       continue;
     }
-    if (SCOPE_COLUMNS.includes(key)) {
-      assert.ok(
-        isMarker(value, "boundScope"),
-        "a scope column takes the bound-scope marker and no literal",
-      );
-      continue;
-    }
     assert.ok(!isMarker(value, "boundRun"), `"${key}" is not the run column`);
-    assert.ok(!isMarker(value, "boundScope"), `"${key}" is not a scope column`);
+    assert.ok(
+      !isMarker(value, "boundScope"),
+      `"${key}" takes no bound-scope marker — the reservation table declares no scope column`,
+    );
   }
   const printed = JSON.stringify(request);
   assert.ok(!printed.includes(BOUND_RUN), "no run id reaches a request");
-  assert.ok(!printed.includes(BOUND_SCOPE.scope_id), "no scope id reaches a request");
 }
 
 /**
  * The ports, as the host binds them: the table operations over an in-memory
- * store whose rows the host stamps with the run and the scope, the artifact
- * reads over the two ideas, the review filing and a fixed clock.
+ * store whose rows the host stamps with the organisation and the run, the
+ * artifact reads over the two ideas, the review filing and a fixed clock.
  */
 function ports(options = {}) {
   const rows = (options.rows ?? []).map((row) => ({
     [ORG_COLUMN]: "org-under-test",
     [RUN_COLUMN]: row[RUN_COLUMN] ?? BOUND_RUN,
-    scope_kind: BOUND_SCOPE.kind,
-    scope_id: BOUND_SCOPE.scope_id,
     ...row,
   }));
   const calls = [];
@@ -118,13 +115,11 @@ function ports(options = {}) {
   const now = options.now ?? new Date("2026-09-12T10:00:00.000Z");
 
   const matches = (row, request) => {
-    if (row.scope_kind !== BOUND_SCOPE.kind || row.scope_id !== BOUND_SCOPE.scope_id) return false;
     for (const [key, value] of Object.entries(request.where ?? {})) {
       if (key === RUN_COLUMN) {
         if (row[RUN_COLUMN] !== BOUND_RUN) return false;
         continue;
       }
-      if (SCOPE_COLUMNS.includes(key)) continue;
       if (row[key] !== value) return false;
     }
     for (const [key, value] of Object.entries(request.expect ?? {})) {
@@ -154,7 +149,8 @@ function ports(options = {}) {
           "insertIfAbsent names the columns identifying the row it would collide with",
         );
         // The table's own one-live-row-per-idea rule, of which the race's only
-        // arbiter is made: the collision is looked for across the scope's runs.
+        // arbiter is made: the collision is looked for across the organisation's
+        // runs.
         const live = rows.find(
           (row) =>
             row.idea_artifact_id === request.row.idea_artifact_id && row.state !== "released",
@@ -170,8 +166,6 @@ function ports(options = {}) {
         const written = {
           [ORG_COLUMN]: "org-under-test",
           [RUN_COLUMN]: BOUND_RUN,
-          scope_kind: BOUND_SCOPE.kind,
-          scope_id: BOUND_SCOPE.scope_id,
           ...request.row,
         };
         rows.push(written);
@@ -285,13 +279,16 @@ describe("op prepare", () => {
     assert.deepEqual(reads.map((r) => r.artifactId), [IDEA_B.artifactId]);
   });
 
-  it("reads its own scope's rows with the bound-scope marker and no run of its own", async () => {
+  it("reads the organisation's rows, with no scope marker and no run of its own", async () => {
     const p = ports({ rows: [reserved(IDEA_A.artifactId, { [RUN_COLUMN]: "another-run" })] });
     await extensionTool({ input: { op: "prepare", ideaType: IDEA_TYPE }, ports: p });
     const select = p.calls.find((c) => c.operation === "select");
     assert.ok(select, "prepare reads the reservation rows");
-    assert.deepEqual(select.where.scope_kind, { boundScope: true });
-    assert.deepEqual(select.where.scope_id, { boundScope: true });
+    assert.deepEqual(
+      select.where,
+      {},
+      "the host narrows the read to the organisation; the module names no column of its own",
+    );
     assert.ok(
       !(RUN_COLUMN in select.where),
       "a sibling run's reservation is exactly what this run must see, so the run is not named",
@@ -526,5 +523,130 @@ describe("op complete", () => {
       ports: p,
     });
     assert.deepEqual(p.filed, ["{not json"], "nothing is silently dropped on the way to a review");
+  });
+});
+
+/**
+ * THE HOST'S REFUSAL FOR A RUN LAUNCHED WITH NO SCOPE. Such a run carries no
+ * launch scope, so the host refuses `no-scope` on any request that asks for the
+ * bound scope, and on EVERY statement against a table that declares a scope pair
+ * (the scope floor stands on each of them) — rather than stamp a scope the run
+ * never recorded. This port is the ordinary fake with exactly that refusal in
+ * front of it, and it reads the declaration from this pack's own manifest.
+ */
+const DECLARED_TABLE = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+).cinatra.declaredTables.find((t) => t && t.name === TABLE);
+
+class ExtensionDataRefusal extends Error {
+  constructor(reason, message) {
+    super(message);
+    this.name = "ExtensionDataRefusal";
+    this.reason = reason;
+  }
+}
+
+function asksForTheBoundScope(request) {
+  return ["where", "row", "set", "expect", "values"].some((field) =>
+    Object.values(request[field] ?? {}).some((value) => isMarker(value, "boundScope")),
+  );
+}
+
+function unanchoredPorts(options = {}) {
+  const p = ports(options);
+  const bindsScope = Boolean(
+    DECLARED_TABLE && (DECLARED_TABLE.scopeKindColumn || DECLARED_TABLE.scopeIdColumn),
+  );
+  for (const operation of ["select", "insertIfAbsent", "updateWhere"]) {
+    const inner = p.data[operation];
+    p.data[operation] = async (request) => {
+      if (bindsScope || asksForTheBoundScope(request)) {
+        p.calls.push({ operation: "refused", reason: "no-scope", of: operation });
+        throw new ExtensionDataRefusal(
+          "no-scope",
+          `extension_data: "${request.table}" binds its rows to the scope their run belongs to and ` +
+            "this call carries none — refusing rather than reaching across scopes",
+        );
+      }
+      return inner(request);
+    };
+  }
+  return p;
+}
+
+describe("a run launched with no scope", () => {
+  it("is offered the organisation's unused ideas, after the lapsed reservations are released", async () => {
+    const p = unanchoredPorts({
+      rows: [
+        reserved(IDEA_A.artifactId, {
+          [RUN_COLUMN]: "abandoned-run",
+          expires_at: "2026-09-12T09:59:59.000Z",
+        }),
+      ],
+    });
+    const result = await extensionTool({ input: { op: "prepare", ideaType: IDEA_TYPE }, ports: p });
+    assert.equal(result.ok, true);
+    assert.equal(result.reason, "");
+    assert.deepEqual(
+      result.ideas.map((idea) => idea.artifactId),
+      [IDEA_A.artifactId, IDEA_B.artifactId],
+    );
+    assert.deepEqual(p.calls.filter((c) => c.operation === "refused"), [], "no request was refused");
+    assert.equal(p.rows[0].state, "released", "the sweep released the lapsed reservation");
+  });
+
+  it("ends with the stated reason, never a refusal, when the organisation holds no idea", async () => {
+    const p = unanchoredPorts({ artifacts: [] });
+    const result = await extensionTool({ input: { op: "prepare", ideaType: IDEA_TYPE }, ports: p });
+    assert.deepEqual(result, {
+      ok: false,
+      ideas: [],
+      reason: offerStoredIdeas({ candidates: [], takenArtifactIds: [] }).reason,
+    });
+  });
+
+  it("takes the picked idea, and the host stamps the organisation and the run", async () => {
+    const offered = [
+      {
+        artifactId: IDEA_B.artifactId,
+        representationRevisionId: IDEA_B.latestRepresentationRevisionId,
+        title: titleFromIdeaText(IDEA_B.text),
+        text: IDEA_B.text,
+      },
+    ];
+    const pick = JSON.stringify({
+      artifactId: IDEA_B.artifactId,
+      representationRevisionId: IDEA_B.latestRepresentationRevisionId,
+    });
+    const p = unanchoredPorts();
+    const result = await extensionTool({
+      input: { op: "reserve", ideaType: IDEA_TYPE, pick, offered: JSON.stringify(offered) },
+      ports: p,
+    });
+    assert.equal(result.reason, "");
+    assert.equal(result.ideaArtifactId, IDEA_B.artifactId);
+    const write = p.calls.find((c) => c.operation === "insertIfAbsent");
+    assert.ok(write, "the reservation was written");
+    assert.deepEqual(write.conflictKeys, ["idea_artifact_id", "state"]);
+    assert.equal(p.rows.length, 1);
+    assert.equal(p.rows[0][RUN_COLUMN], BOUND_RUN, "the host stamped the run, not the module");
+  });
+
+  it("completes its reservation into the relation, keyed by the run alone", async () => {
+    const p = unanchoredPorts({ rows: [reserved(IDEA_A.artifactId)] });
+    const result = await extensionTool({
+      input: {
+        op: "complete",
+        ideaType: IDEA_TYPE,
+        ideaArtifactId: IDEA_A.artifactId,
+        draftArtifactId: "draft-1",
+        reviewTargets: "[]",
+      },
+      ports: p,
+    });
+    assert.deepEqual(result, { ok: true });
+    const write = p.calls.find((c) => c.operation === "updateWhere");
+    assert.deepEqual(write.where, { idea_artifact_id: IDEA_A.artifactId, [RUN_COLUMN]: { boundRun: true } });
+    assert.equal(p.rows[0].state, "drafted");
   });
 });

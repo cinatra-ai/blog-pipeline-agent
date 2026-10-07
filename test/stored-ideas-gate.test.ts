@@ -428,8 +428,6 @@ describe("the relation the pack declares is the relation the gate names", () => 
         "idea_revision_id",
         "org_id",
         "run_id",
-        "scope_id",
-        "scope_kind",
         "state",
       ],
     );
