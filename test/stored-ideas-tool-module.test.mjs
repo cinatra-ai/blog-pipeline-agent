@@ -34,7 +34,7 @@ import {
   titleFromIdeaText,
 } from "../src/lib/blog/stored-ideas-gate.ts";
 
-const TABLE = "idea_drafts";
+const TABLE = "idea_claims";
 const IDEA_TYPE = "@cinatra-ai/blog-idea-artifact:blog-idea";
 const ORG_COLUMN = "org_id";
 const RUN_COLUMN = "run_id";
@@ -105,6 +105,7 @@ function assertBoundColumnsAreTheHosts(request) {
  * artifact reads over the two ideas, the review filing and a fixed clock.
  */
 function ports(options = {}) {
+  let nextClaim = 100;
   const rows = (options.rows ?? []).map((row) => ({
     [ORG_COLUMN]: "org-under-test",
     [RUN_COLUMN]: row[RUN_COLUMN] ?? BOUND_RUN,
@@ -137,7 +138,10 @@ function ports(options = {}) {
         calls.push({ operation: "select", ...request });
         assert.equal(request.table, TABLE);
         assertBoundColumnsAreTheHosts(request);
-        const selected = rows.filter((row) => matches(row, request));
+        // The host filters first, then applies its bounded read window. Do not
+        // let append-only released history pass tests by ignoring LIMIT.
+        const limit = Math.min(1000, request.limit ?? 100);
+        const selected = rows.filter((row) => matches(row, request)).slice(0, limit);
         return { rows: selected, rowCount: selected.length, table: TABLE };
       },
       async insertIfAbsent(request) {
@@ -148,13 +152,15 @@ function ports(options = {}) {
           (request.conflictKeys ?? []).length > 0,
           "insertIfAbsent names the columns identifying the row it would collide with",
         );
-        // The table's own one-live-row-per-idea rule, of which the race's only
-        // arbiter is made: the collision is looked for across the organisation's
-        // runs.
-        const live = rows.find(
-          (row) =>
-            row.idea_artifact_id === request.row.idea_artifact_id && row.state !== "released",
-        );
+        // Model the manifest's ordinary UNIQUE columns, including SQL NULL
+        // semantics. This deliberately does not invent a cross-state constraint.
+        const declaration = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"))
+          .cinatra.declaredTables.find((table) => table.name === TABLE);
+        const live = rows.find((row) => declaration.indexes.some((index) => index.unique &&
+          index.columns.every((key) => {
+            const value = key === ORG_COLUMN ? "org-under-test" : request.row[key];
+            return value != null && row[key] === value;
+          })));
         if (live) {
           // Another run's winning row is never "the row that won" for this one.
           return {
@@ -166,6 +172,7 @@ function ports(options = {}) {
         const written = {
           [ORG_COLUMN]: "org-under-test",
           [RUN_COLUMN]: BOUND_RUN,
+          claim_id: `00000000-0000-0000-0000-${String(++nextClaim).padStart(12, "0")}`,
           ...request.row,
         };
         rows.push(written);
@@ -175,6 +182,7 @@ function ports(options = {}) {
         calls.push({ operation: "updateWhere", ...request });
         assert.equal(request.table, TABLE);
         assertBoundColumnsAreTheHosts(request);
+        options.beforeUpdate?.(request, rows);
         let updated = 0;
         for (const row of rows) {
           if (!matches(row, request)) continue;
@@ -223,6 +231,8 @@ function ports(options = {}) {
 }
 
 const reserved = (ideaArtifactId, extra = {}) => ({
+  claim_id: ideaArtifactId === IDEA_B.artifactId ? "00000000-0000-0000-0000-000000000002" : "00000000-0000-0000-0000-000000000001",
+  active_idea_key: ideaArtifactId,
   idea_artifact_id: ideaArtifactId,
   idea_revision_id: `${ideaArtifactId}-rev`,
   state: "reserved",
@@ -286,8 +296,8 @@ describe("op prepare", () => {
     assert.ok(select, "prepare reads the reservation rows");
     assert.deepEqual(
       select.where,
-      {},
-      "the host narrows the read to the organisation; the module names no column of its own",
+      { active_idea_key: IDEA_A.artifactId },
+      "the host scopes the organisation and the module targets only the candidate's active key",
     );
     assert.ok(
       !(RUN_COLUMN in select.where),
@@ -329,9 +339,11 @@ describe("op prepare", () => {
       "the sweep runs AHEAD of the reads, so the offer is the list it just widened",
     );
     const release = p.calls.find((c) => c.operation === "updateWhere");
-    assert.deepEqual(release.set, { state: "released", expires_at: null });
+    assert.deepEqual(release.set, { state: "released", active_idea_key: null, expires_at: null });
     assert.equal(release.where.idea_artifact_id, IDEA_A.artifactId);
-    assert.equal(release.where.state, "reserved");
+    assert.equal(release.expect.state, "reserved");
+    assert.equal(release.where.claim_id, p.rows[0].claim_id);
+    assert.equal(release.where.expires_at, "2026-09-12T09:59:59.000Z");
     assert.ok(
       !(RUN_COLUMN in release.where),
       "the sweep releases reservations of runs that are not this one",
@@ -374,6 +386,7 @@ describe("op reserve", () => {
     });
     assert.deepEqual(result, {
       idea: IDEA_B.text,
+      claimId: p.rows[0].claim_id,
       ideaArtifactId: IDEA_B.artifactId,
       ideaRevisionId: IDEA_B.latestRepresentationRevisionId,
       ideaTitle: titleFromIdeaText(IDEA_B.text),
@@ -381,6 +394,7 @@ describe("op reserve", () => {
     });
     const write = p.calls.find((c) => c.operation === "insertIfAbsent");
     assert.deepEqual(Object.keys(write.row).sort(), [
+      "active_idea_key",
       "created_at",
       "draft_artifact_id",
       "expires_at",
@@ -459,6 +473,7 @@ describe("op complete", () => {
         op: "complete",
         ideaType: IDEA_TYPE,
         ideaArtifactId: IDEA_A.artifactId,
+        claimId: "00000000-0000-0000-0000-000000000001",
         draftArtifactId: "draft-1",
         reviewTargets: JSON.stringify(targets),
       },
@@ -484,6 +499,7 @@ describe("op complete", () => {
       op: "complete",
       ideaType: IDEA_TYPE,
       ideaArtifactId: IDEA_A.artifactId,
+      claimId: "00000000-0000-0000-0000-000000000001",
       draftArtifactId: "draft-1",
       reviewTargets: JSON.stringify([
         { artifactId: "draft-1", representationRevisionId: "draft-rev-1" },
@@ -502,6 +518,7 @@ describe("op complete", () => {
         op: "complete",
         ideaType: IDEA_TYPE,
         ideaArtifactId: IDEA_A.artifactId,
+        claimId: "00000000-0000-0000-0000-000000000001",
         draftArtifactId: "draft-1",
         reviewTargets: "[]",
       },
@@ -517,6 +534,7 @@ describe("op complete", () => {
         op: "complete",
         ideaType: IDEA_TYPE,
         ideaArtifactId: IDEA_A.artifactId,
+        claimId: "00000000-0000-0000-0000-000000000001",
         draftArtifactId: "draft-1",
         reviewTargets: "{not json",
       },
@@ -627,18 +645,19 @@ describe("a run launched with no scope", () => {
     assert.equal(result.ideaArtifactId, IDEA_B.artifactId);
     const write = p.calls.find((c) => c.operation === "insertIfAbsent");
     assert.ok(write, "the reservation was written");
-    assert.deepEqual(write.conflictKeys, ["idea_artifact_id", "state"]);
+    assert.deepEqual(write.conflictKeys, ["active_idea_key"]);
     assert.equal(p.rows.length, 1);
     assert.equal(p.rows[0][RUN_COLUMN], BOUND_RUN, "the host stamped the run, not the module");
   });
 
-  it("completes its reservation into the relation, keyed by the run alone", async () => {
+  it("completes its reservation into the relation, keyed by claim and bound run", async () => {
     const p = unanchoredPorts({ rows: [reserved(IDEA_A.artifactId)] });
     const result = await extensionTool({
       input: {
         op: "complete",
         ideaType: IDEA_TYPE,
         ideaArtifactId: IDEA_A.artifactId,
+        claimId: "00000000-0000-0000-0000-000000000001",
         draftArtifactId: "draft-1",
         reviewTargets: "[]",
       },
@@ -646,7 +665,148 @@ describe("a run launched with no scope", () => {
     });
     assert.deepEqual(result, { ok: true });
     const write = p.calls.find((c) => c.operation === "updateWhere");
-    assert.deepEqual(write.where, { idea_artifact_id: IDEA_A.artifactId, [RUN_COLUMN]: { boundRun: true } });
+    assert.deepEqual(write.where, { claim_id: p.rows[0].claim_id, idea_artifact_id: IDEA_A.artifactId, [RUN_COLUMN]: { boundRun: true } });
     assert.equal(p.rows[0].state, "drafted");
   });
+});
+
+// A stale offered list stays parked while another run completes its draft.
+// The OLD unique(org, idea, state) admits another reserved row beside drafted.
+describe("immutable idea claims", () => {
+  it("refuses a stale offered reserve after the idea is drafted", async () => {
+    const p = ports({ rows: [reserved(IDEA_A.artifactId, {
+      state: "drafted", draft_artifact_id: "draft-first", expires_at: null,
+    })] });
+    const offered = [{ artifactId: IDEA_A.artifactId,
+      representationRevisionId: IDEA_A.latestRepresentationRevisionId, text: IDEA_A.text }];
+    const result = await extensionTool({ input: { op: "reserve", ideaType: IDEA_TYPE,
+      pick: JSON.stringify(offered[0]), offered }, ports: p });
+    assert.deepEqual(result, { reason: IDEA_TAKEN_REASON });
+    assert.equal(p.rows.length, 1, "no second claim alongside the drafted history");
+  });
+});
+
+
+describe("claim completion and expiration boundaries", () => {
+  const call = { op: "complete", ideaType: IDEA_TYPE, ideaArtifactId: IDEA_A.artifactId,
+    claimId: "00000000-0000-0000-0000-000000000001", draftArtifactId: "draft-one",
+    reviewTargets: '[{"artifactId":"draft-one","representationRevisionId":"draft-rev"}]' };
+  it("refuses missing or malformed claim identities before any port use", async () => {
+    for (const claimId of [undefined, "", "not-a-uuid"]) {
+      const p = ports({ rows: [reserved(IDEA_A.artifactId)] });
+      assert.deepEqual(await extensionTool({ input: { ...call, claimId }, ports: p }), { ok: false });
+      assert.deepEqual(p.calls, []);
+    }
+  });
+  it("cannot complete a sibling run's claim", async () => {
+    const p = ports({ rows: [reserved(IDEA_A.artifactId, { run_id: "other-run" })] });
+    assert.deepEqual(await extensionTool({ input: call, ports: p }), { ok: false });
+    assert.equal(p.rows[0].state, "reserved");
+    assert.deepEqual(p.filed, []);
+  });
+  it("never completes a released or expired claim", async () => {
+    for (const extra of [{ state: "released", active_idea_key: null },
+      { expires_at: "2026-09-12T09:59:00.000Z" }]) {
+      const p = ports({ rows: [reserved(IDEA_A.artifactId, extra)] });
+      assert.deepEqual(await extensionTool({ input: call, ports: p }), { ok: false });
+      assert.deepEqual(p.filed, []);
+    }
+  });
+  it("retains the original draft and active key on a different-draft retry", async () => {
+    const p = ports({ rows: [reserved(IDEA_A.artifactId)] });
+    assert.deepEqual(await extensionTool({ input: call, ports: p }), { ok: true });
+    assert.deepEqual(await extensionTool({ input: call, ports: p }), { ok: true });
+    assert.deepEqual(await extensionTool({ input: { ...call, draftArtifactId: "draft-other" }, ports: p }), { ok: false });
+    assert.equal(p.rows[0].draft_artifact_id, "draft-one");
+    assert.equal(p.rows[0].active_idea_key, IDEA_A.artifactId);
+  });
+  it("creates a new claim after expiry and refuses completion by the old same-run claim", async () => {
+    const p = ports({ rows: [reserved(IDEA_A.artifactId, { expires_at: "2026-09-12T09:59:00.000Z" })] });
+    await extensionTool({ input: { op: "prepare", ideaType: IDEA_TYPE }, ports: p });
+    const offered = [{ artifactId: IDEA_A.artifactId, representationRevisionId: IDEA_A.latestRepresentationRevisionId }];
+    const next = await extensionTool({ input: { op: "reserve", ideaType: IDEA_TYPE, offered, pick: offered[0] }, ports: p });
+    assert.notEqual(next.claimId, call.claimId);
+    assert.equal(p.rows.length, 2, "released history is retained beside the new claim");
+    assert.equal(p.rows[0].active_idea_key, null);
+    assert.deepEqual(await extensionTool({ input: call, ports: p }), { ok: false });
+    assert.equal(p.rows[1].state, "reserved");
+    assert.deepEqual(await extensionTool({ input: { ...call, claimId: next.claimId }, ports: p }), { ok: true });
+  });
+  it("cannot release a lease renewed between the sweep read and update", async () => {
+    const p = ports({ rows: [reserved(IDEA_A.artifactId, { expires_at: "2026-09-12T09:59:00.000Z" })],
+      beforeUpdate: (_request, rows) => { rows[0].expires_at = "2026-09-14T10:00:00.000Z"; } });
+    const result = await extensionTool({ input: { op: "prepare", ideaType: IDEA_TYPE }, ports: p });
+    assert.ok(!result.ideas.some((idea) => idea.artifactId === IDEA_A.artifactId));
+    assert.equal(p.rows[0].state, "reserved");
+    assert.equal(p.rows[0].active_idea_key, IDEA_A.artifactId);
+  });
+  it("a stale expiry sweep cannot release a successor claim", async () => {
+    const p = ports({ rows: [reserved(IDEA_A.artifactId, { expires_at: "2026-09-12T09:59:00.000Z" })],
+      beforeUpdate: (_request, rows) => { rows[0].claim_id = "00000000-0000-0000-0000-000000000099"; } });
+    await extensionTool({ input: { op: "prepare", ideaType: IDEA_TYPE }, ports: p });
+    assert.equal(p.rows[0].state, "reserved");
+  });
+  it("a renewed claim between completion read and update refuses the stale CAS", async () => {
+    const p = ports({ rows: [reserved(IDEA_A.artifactId)],
+      beforeUpdate: (_request, rows) => { rows[0].expires_at = "2026-09-15T10:00:00.000Z"; } });
+    assert.deepEqual(await extensionTool({ input: call, ports: p }), { ok: false });
+    assert.equal(p.rows[0].state, "reserved");
+    assert.deepEqual(p.filed, []);
+  });
+  it("a conflict without a visible winner remains a refusal", async () => {
+    const p = ports();
+    p.data.insertIfAbsent = async () => ({ inserted: false, conflict: true, existing: null });
+    const offered = [{ artifactId: IDEA_A.artifactId, representationRevisionId: IDEA_A.latestRepresentationRevisionId }];
+    assert.deepEqual(await extensionTool({ input: { op: "reserve", ideaType: IDEA_TYPE, offered, pick: offered[0] }, ports: p }),
+      { reason: IDEA_TAKEN_REASON });
+  });
+});
+
+
+describe("claim history beyond the host read limit", () => {
+  const history = () => Array.from({ length: 1001 }, (_, index) =>
+    reserved(IDEA_A.artifactId, {
+      claim_id: `10000000-0000-0000-0000-${String(index + 1).padStart(12, "0")}`,
+      state: "released", active_idea_key: null, expires_at: null,
+    }));
+  it("reclaims an expired claim after more than 1000 released leases", async () => {
+    const expired = reserved(IDEA_A.artifactId, {
+      claim_id: "20000000-0000-0000-0000-000000000001",
+      expires_at: "2026-09-12T09:59:00.000Z",
+    });
+    const p = ports({ rows: [...history(), expired] });
+    const offer = await extensionTool({ input: { op: "prepare", ideaType: IDEA_TYPE }, ports: p });
+    const reclaimed = p.rows.at(-1);
+    assert.equal(reclaimed.state, "released", "the later expired active claim is actually swept");
+    assert.equal(reclaimed.active_idea_key, null);
+    assert.ok(offer.ideas.some((idea) => idea.artifactId === IDEA_A.artifactId));
+    assert.equal(p.rows.length, 1002, "every history row is retained");
+    const picked = { artifactId: IDEA_A.artifactId, representationRevisionId: IDEA_A.latestRepresentationRevisionId };
+    const next = await extensionTool({ input: { op: "reserve", ideaType: IDEA_TYPE, offered: [picked], pick: picked }, ports: p });
+    assert.ok(next.claimId, "the reclaimed idea can actually be reserved");
+    assert.notEqual(next.claimId, expired.claim_id);
+    assert.equal(p.rows.length, 1003);
+    const queries = p.calls.filter((call) => call.operation === "select");
+    assert.deepEqual(queries.map((call) => call.where),
+      [{ active_idea_key: IDEA_A.artifactId }, { active_idea_key: IDEA_B.artifactId }]);
+    assert.ok(queries.every((call) => call.limit === 1));
+  });
+  for (const state of ["drafted", "reserved"]) {
+    it(`excludes a later ${state} claim despite more than 1000 released leases`, async () => {
+      const held = reserved(IDEA_A.artifactId, {
+        claim_id: "20000000-0000-0000-0000-000000000002", state,
+        draft_artifact_id: state === "drafted" ? "draft-existing" : null,
+        expires_at: state === "drafted" ? null : "2026-09-14T10:00:00.000Z",
+      });
+      const p = ports({ rows: [...history(), held] });
+      const offer = await extensionTool({ input: { op: "prepare", ideaType: IDEA_TYPE }, ports: p });
+      assert.deepEqual(offer.ideas.map((idea) => idea.artifactId), [IDEA_B.artifactId]);
+      assert.equal(p.rows.at(-1).state, state);
+      assert.equal(p.rows.at(-1).active_idea_key, IDEA_A.artifactId);
+      assert.equal(p.rows.length, 1002);
+      assert.deepEqual(p.calls.filter((call) => call.operation === "artifact_content_read")
+        .map((call) => call.artifactId), [IDEA_B.artifactId]);
+      assert.equal(p.calls.filter((call) => call.operation === "updateWhere").length, 0);
+    });
+  }
 });

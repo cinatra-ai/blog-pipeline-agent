@@ -1185,6 +1185,21 @@
         "$component_ref": "end"
       },
       "destination_input": "linkedinTitle"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "claimId:reserve_idea->complete_relation.claimId",
+      "name": "claimId:reserve_idea->complete_relation",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "reserve_idea"
+      },
+      "source_output": "claimId",
+      "destination_node": {
+        "$component_ref": "complete_relation"
+      },
+      "destination_input": "claimId"
     }
   ],
   "$referenced_components": {
@@ -1457,6 +1472,10 @@
           "title": "reason",
           "type": "string",
           "default": ""
+        },
+        {
+          "title": "claimId",
+          "type": "string"
         }
       ],
       "metadata": {
@@ -4290,7 +4309,8 @@
             "ideaType": "@cinatra-ai/blog-idea-artifact:blog-idea",
             "ideaArtifactId": "{{ ideaArtifactId }}",
             "draftArtifactId": "{{ draftArtifactId }}",
-            "reviewTargets": "[{\"artifactId\": \"{{ draftArtifactId }}\", \"representationRevisionId\": \"{{ draftRevisionId }}\"}, {\"artifactId\": \"{{ imageArtifactId }}\", \"representationRevisionId\": \"{{ imageRevisionId }}\"}]"
+            "reviewTargets": "[{\"artifactId\": \"{{ draftArtifactId }}\", \"representationRevisionId\": \"{{ draftRevisionId }}\"}, {\"artifactId\": \"{{ imageArtifactId }}\", \"representationRevisionId\": \"{{ imageRevisionId }}\"}]",
+            "claimId": "{{ claimId }}"
           }
         },
         "agent_run_id": "{{ cinatra_run_id }}",
@@ -4327,6 +4347,11 @@
           "title": "cinatra_run_id",
           "type": "string",
           "default": ""
+        },
+        {
+          "title": "claimId",
+          "type": "string",
+          "default": ""
         }
       ],
       "outputs": [
@@ -4346,7 +4371,7 @@
           "riskClass": "write",
           "requiresApproval": false,
           "packageName": "@cinatra-ai/blog-pipeline-agent",
-          "description": "Two sentences of plan (C) section 6.1 in one call. It completes the reservation into the relation row \u2014 this idea, this draft, keyed by run and idea so a retry completes the same row and never a second \u2014 and it is the projection step of section 8.4: the call echoes its own input back, so the immutable reference the mid-run write returned reaches the review step as the set the marker below names. The set names the post first and its featured image second. The call answers with the completion own ok flag, so a completion that did not land is visible in the run rather than hidden behind the echo; the run does not branch on it here, and an uncompleted reservation lapses on its own."
+          "description": "Two sentences of plan (C) section 6.1 in one call. It completes the reservation into the relation row \u2014 this idea, this draft, keyed by immutable claim, run and idea so a retry completes the same row and never a second \u2014 and it is the projection step of section 8.4: the call echoes its own input back, so the immutable reference the mid-run write returned reaches the review step as the set the marker below names. The set names the post first and its featured image second. The call answers with the completion own ok flag, so a completion that did not land is visible in the run rather than hidden behind the echo; the run does not branch on it here, and an uncompleted reservation lapses on its own."
         }
       }
     },
