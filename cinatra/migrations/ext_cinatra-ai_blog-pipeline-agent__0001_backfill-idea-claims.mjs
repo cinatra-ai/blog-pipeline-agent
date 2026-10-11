@@ -3,6 +3,9 @@
  * before this module runs under the package's SELECT/INSERT/UPDATE/DELETE role.
  * App must quiesce every legacy writer and reissue stale offers before the
  * migration and activation; this transaction lock does not fence later writers.
+ * A single drafted row wins over one live stale reservation for the same org
+ * and idea. Release only that reservation; keep its original legacy provenance.
+ * Duplicate drafts or live reservations still refuse the entire activation.
  * Queue every statement: the runner owns the transaction and applied ledger.
  */
 export function up(pgm) {
@@ -28,7 +31,9 @@ export function up(pgm) {
     IF EXISTS (
       SELECT org_id, idea_artifact_id FROM ext_cinatra_ai_blog_pipeline_agent_idea_drafts
       WHERE state = 'drafted' OR (state = 'reserved' AND expires_at > CURRENT_TIMESTAMP)
-      GROUP BY org_id, idea_artifact_id HAVING count(*) > 1
+      GROUP BY org_id, idea_artifact_id
+      HAVING count(*) FILTER (WHERE state = 'drafted') > 1
+        OR count(*) FILTER (WHERE state = 'reserved') > 1
     ) THEN
       RAISE EXCEPTION 'Conflicting active legacy idea history; refusing activation';
     END IF;
@@ -36,14 +41,25 @@ export function up(pgm) {
       (org_id, run_id, idea_artifact_id, idea_revision_id, state, draft_artifact_id,
         expires_at, created_at, active_idea_key, legacy_state, legacy_expires_at)
     SELECT org_id, run_id, idea_artifact_id, idea_revision_id,
-      CASE WHEN state = 'reserved' AND expires_at <= CURRENT_TIMESTAMP THEN 'released' ELSE state END,
+      CASE WHEN release_reservation THEN 'released' ELSE state END,
       draft_artifact_id,
-      CASE WHEN state = 'reserved' AND expires_at > CURRENT_TIMESTAMP THEN expires_at ELSE NULL END,
+      CASE WHEN state = 'reserved' AND NOT release_reservation THEN expires_at ELSE NULL END,
       created_at,
-      CASE WHEN state = 'drafted' OR (state = 'reserved' AND expires_at > CURRENT_TIMESTAMP)
+      CASE WHEN state = 'drafted' OR (state = 'reserved' AND NOT release_reservation)
         THEN idea_artifact_id ELSE NULL END,
       state, expires_at
-    FROM ext_cinatra_ai_blog_pipeline_agent_idea_drafts;
+    FROM (
+      SELECT legacy.*,
+        legacy.state = 'reserved' AND (
+          legacy.expires_at <= CURRENT_TIMESTAMP OR EXISTS (
+            SELECT 1 FROM ext_cinatra_ai_blog_pipeline_agent_idea_drafts AS drafted
+            WHERE drafted.org_id = legacy.org_id
+              AND drafted.idea_artifact_id = legacy.idea_artifact_id
+              AND drafted.state = 'drafted'
+          )
+        ) AS release_reservation
+      FROM ext_cinatra_ai_blog_pipeline_agent_idea_drafts AS legacy
+    ) AS classified;
   END;
   $backfill$;`);
 }
