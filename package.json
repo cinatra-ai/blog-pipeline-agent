@@ -215,8 +215,89 @@
             ]
           }
         ]
+      },
+      {
+        "name": "idea_claims",
+        "organizationColumn": "org_id",
+        "runColumn": "run_id",
+        "columns": [
+          {
+            "name": "claim_id",
+            "type": "uuid",
+            "notNull": true,
+            "primaryKey": true,
+            "default": "gen_random_uuid()"
+          },
+          {
+            "name": "org_id",
+            "type": "text",
+            "notNull": true
+          },
+          {
+            "name": "run_id",
+            "type": "text",
+            "notNull": true
+          },
+          {
+            "name": "idea_artifact_id",
+            "type": "text",
+            "notNull": true
+          },
+          {
+            "name": "idea_revision_id",
+            "type": "text",
+            "notNull": true
+          },
+          {
+            "name": "state",
+            "type": "text",
+            "notNull": true
+          },
+          {
+            "name": "draft_artifact_id",
+            "type": "text"
+          },
+          {
+            "name": "expires_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "created_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "active_idea_key",
+            "type": "text"
+          },
+          {
+            "name": "legacy_state",
+            "type": "text"
+          },
+          {
+            "name": "legacy_expires_at",
+            "type": "timestamptz"
+          }
+        ],
+        "indexes": [
+          {
+            "name": "idea_claims_one_active",
+            "columns": [
+              "org_id",
+              "active_idea_key"
+            ],
+            "unique": true
+          },
+          {
+            "name": "idea_claims_by_run",
+            "columns": [
+              "org_id",
+              "run_id"
+            ]
+          }
+        ]
       }
-    ]
+    ],
+    "migrationsDir": "./cinatra/migrations"
   },
   "scripts": {
     "test": "sh -c \"node --test\""

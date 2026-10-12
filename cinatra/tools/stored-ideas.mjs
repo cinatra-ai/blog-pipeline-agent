@@ -30,14 +30,14 @@
  */
 
 /** The reservation table, as this pack's manifest declares it. */
-const TABLE = "idea_drafts";
+const TABLE = "idea_claims";
 /** The host-bound run column of that table, named here only to ask for "mine". */
 const RUN_COLUMN = "run_id";
 /** The marker the data contract defines, and the only value that column takes in
  *  a request. */
 const BOUND_RUN = Object.freeze({ boundRun: true });
 
-/** A row is live — it takes its idea off the list — until it is released. */
+/** The active key remains held through drafting; released history keeps no key. */
 const RESERVED = "reserved";
 const DRAFTED = "drafted";
 const RELEASED = "released";
@@ -113,14 +113,15 @@ function titleFromIdeaText(value) {
   return firstLine.replace(/^title\s*:\s*/i, "").trim();
 }
 
-/** The reservation rows of the organisation, which the host narrows every
- *  statement to. NOT this run's alone: a reservation another run took is exactly
- *  what this run must not take again, so the run column is not named here. */
-async function selectRelationRows(ports) {
+/** The active claim for one candidate, across this organisation's runs.
+ * Released history has a NULL key, so it cannot exhaust this read's window.
+ * UNIQUE(org_id, active_idea_key) makes the targeted equality match at most one
+ * row. The host injects the organisation; a sibling run's claim must be seen. */
+async function selectRelationRows(ports, ideaArtifactId) {
   const answer = await ports.data.select({
     table: TABLE,
-    where: {},
-    limit: 1000,
+    where: { active_idea_key: ideaArtifactId },
+    limit: 1,
   });
   const rows = answer && Array.isArray(answer.rows) ? answer.rows : [];
   return rows;
@@ -129,10 +130,14 @@ async function selectRelationRows(ports) {
 /** The artifact ids a set of rows takes off the list: every row that is not
  *  released. A lapsed reservation is already released by the sweep below, so
  *  state alone is read here. */
+function validClaimId(value) {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
 function takenArtifactIds(rows) {
   const taken = [];
   for (const row of rows) {
-    if (text(row.state) === RELEASED) continue;
+    if (row.active_idea_key === null) continue;
     const id = text(row.idea_artifact_id);
     if (id.length > 0) taken.push(id);
   }
@@ -160,14 +165,10 @@ function expiredReservationRows(rows, now) {
  * Release every lapsed reservation, and answer with the rows that still take
  * their idea off the list.
  *
- * KEYED ON THE IDEA AND THE RESERVED STATE, read off the row: the sweep releases
- * reservations of runs that are not this one — that is the whole point of it —
- * and the run a row belongs to is the host's, never nameable in a request. The
- * reserved state is what keeps a row already completed into a relation standing,
- * so a finished draft never hands its idea back to the list, and the table's own
- * one-live-row-per-idea rule is what makes the idea an exact key. A release the
- * write refused leaves the idea taken for this offer, and the next preparation
- * sweeps again.
+ * KEYED ON THE IMMUTABLE CLAIM AND ITS OBSERVED EXPIRY. A stale sweep cannot
+ * release a renewed lease or a replacement claim. State and active key are
+ * compared in the same update and the history row is retained. A refused
+ * release keeps the idea taken for this offer, rather than guessing it free.
  */
 async function releaseExpiredReservations(ports, rows, now) {
   const expired = expiredReservationRows(rows, now);
@@ -175,11 +176,12 @@ async function releaseExpiredReservations(ports, rows, now) {
   const released = new Set();
   for (const row of expired) {
     const ideaArtifactId = text(row.idea_artifact_id);
-    if (ideaArtifactId === "") continue;
+    if (ideaArtifactId === "" || !validClaimId(row.claim_id)) continue;
     const written = await ports.data.updateWhere({
       table: TABLE,
-      set: { state: RELEASED, expires_at: null },
-      where: { idea_artifact_id: ideaArtifactId, state: RESERVED },
+      set: { state: RELEASED, active_idea_key: null, expires_at: null },
+      where: { claim_id: row.claim_id, idea_artifact_id: ideaArtifactId, expires_at: row.expires_at },
+      expect: { state: RESERVED, active_idea_key: ideaArtifactId },
     });
     if ((written?.updated ?? 0) > 0) released.add(row);
   }
@@ -228,13 +230,6 @@ async function readIdeaText(ports, reference) {
 async function prepare(input, ports) {
   const ideaType = requireIdeaType(input);
   const now = ports.clock.now();
-  const rows = await selectRelationRows(ports);
-  // EXPIRED RESERVATIONS ARE RELEASED BEFORE THE OFFER IS SELECTED, ahead of the
-  // subtraction and the reads: a lapsed reservation swept after the list was
-  // drawn would hand its idea back to nobody, and the offer this run makes is the
-  // list the sweep just widened.
-  const live = await releaseExpiredReservations(ports, rows, now);
-  const taken = new Set(takenArtifactIds(live));
   // ONE CONTENT READ PER UNUSED IDEA, and none for an idea already taken: the
   // subtraction happens before the reads, so a list of a hundred ideas of which
   // two are free costs two reads.
@@ -248,10 +243,14 @@ async function prepare(input, ports) {
       ...(cursor === null ? {} : { cursor }),
     });
     for (const reference of artifactReferences(page)) {
-      if (taken.has(reference.artifactId)) continue;
       if (seen.has(reference.artifactId)) continue;
       if (ideas.length >= MAX_OFFERED_IDEAS) break;
       seen.add(reference.artifactId);
+      // Read only this candidate's unique active key, then sweep its observed
+      // lease before offering it. A refused CAS retains the idea as taken.
+      const rows = await selectRelationRows(ports, reference.artifactId);
+      const live = await releaseExpiredReservations(ports, rows, now);
+      if (takenArtifactIds(live).includes(reference.artifactId)) continue;
       const read = await readIdeaText(ports, reference);
       const body = read ?? "";
       ideas.push({ ...reference, text: body, title: titleFromIdeaText(body) });
@@ -346,17 +345,19 @@ async function reserve(input, ports) {
     table: TABLE,
     row: {
       idea_artifact_id: idea.artifactId,
+      active_idea_key: idea.artifactId,
       idea_revision_id: idea.representationRevisionId,
       state: RESERVED,
       draft_artifact_id: null,
       expires_at: new Date(now.getTime() + RESERVATION_TTL_MS).toISOString(),
       created_at: now.toISOString(),
     },
-    conflictKeys: ["idea_artifact_id", "state"],
+    conflictKeys: ["active_idea_key"],
   });
-  if (written?.inserted === true) {
+  if (written?.inserted === true && validClaimId(written.row?.claim_id)) {
     return {
       idea: idea.text,
+      claimId: written.row.claim_id,
       ideaArtifactId: idea.artifactId,
       ideaRevisionId: idea.representationRevisionId,
       ideaTitle: idea.title === "" ? titleFromIdeaText(idea.text) : idea.title,
@@ -371,20 +372,47 @@ async function reserve(input, ports) {
  * Complete the reservation into the relation: this idea, this draft — and file
  * the revisions this run's review gate pins.
  *
- * KEYED BY THIS RUN AND THE IDEA, so a retry after a failure completes the SAME
- * row and never a second. The expiry is cleared because a drafted relation is not
- * a reservation and never lapses; the draft written before a later failure stays,
- * as an audited draft, and only its reservation is released.
+ * KEYED BY THE DB-GENERATED CLAIM, THIS RUN AND THE IDEA. Completion never
+ * revives an expired/released claim or acts on a successor. A retry succeeds
+ * only for the same already-drafted claim and draft; it cannot overwrite it.
+ * The active key stays held after drafting. Review filing is a separate host
+ * operation, not part of the data statement's transaction.
  */
 async function complete(input, ports) {
   requireIdeaType(input);
   const ideaArtifactId = text(input.ideaArtifactId);
   const draftArtifactId = text(input.draftArtifactId);
-  const written = await ports.data.updateWhere({
+  const claimId = input.claimId;
+  if (!validClaimId(claimId) || !ideaArtifactId.trim() || !draftArtifactId.trim()) return { ok: false };
+  const observed = await ports.data.select({
+    table: TABLE,
+    where: { claim_id: claimId, idea_artifact_id: ideaArtifactId, [RUN_COLUMN]: BOUND_RUN },
+    limit: 1,
+  });
+  const claim = Array.isArray(observed?.rows) ? observed.rows[0] : null;
+  if (!claim) return { ok: false };
+  const retryOfSameDraft = claim.state === DRAFTED && claim.active_idea_key === ideaArtifactId &&
+    claim.draft_artifact_id === draftArtifactId;
+  const expiry = claim.expires_at instanceof Date ? claim.expires_at.getTime() : Date.parse(claim.expires_at);
+  if (!retryOfSameDraft && (claim.state !== RESERVED || claim.active_idea_key !== ideaArtifactId ||
+    !Number.isFinite(expiry) || expiry <= ports.clock.now().getTime())) return { ok: false };
+  const written = retryOfSameDraft ? { updated: 1 } : await ports.data.updateWhere({
     table: TABLE,
     set: { state: DRAFTED, draft_artifact_id: draftArtifactId, expires_at: null },
-    where: { idea_artifact_id: ideaArtifactId, [RUN_COLUMN]: BOUND_RUN },
+    where: { claim_id: claimId, idea_artifact_id: ideaArtifactId, [RUN_COLUMN]: BOUND_RUN },
+    expect: { state: RESERVED, active_idea_key: ideaArtifactId, expires_at: claim.expires_at },
   });
+  let ok = (written?.updated ?? 0) === 1;
+  if (!ok) {
+    const retry = await ports.data.select({
+      table: TABLE,
+      where: { claim_id: claimId, idea_artifact_id: ideaArtifactId, [RUN_COLUMN]: BOUND_RUN,
+        state: DRAFTED, active_idea_key: ideaArtifactId, draft_artifact_id: draftArtifactId },
+      limit: 1,
+    });
+    ok = Array.isArray(retry?.rows) && retry.rows.length === 1;
+  }
+  if (!ok) return { ok: false };
   // THE FILING IS THE HOST'S TO VALIDATE. A set this module cannot read is
   // handed over as it arrived, so a malformed filing is refused with a stated
   // reason rather than silently dropped on the way to a review surface.
@@ -393,7 +421,7 @@ async function complete(input, ports) {
     const targets = parsed === null ? input.reviewTargets : parsed;
     if (!Array.isArray(targets) || targets.length > 0) ports.review.file(targets);
   }
-  return { ok: (written?.updated ?? 0) > 0 };
+  return { ok };
 }
 
 /**

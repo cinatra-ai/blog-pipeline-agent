@@ -108,7 +108,7 @@ test("the three stored-ideas steps call the host's generic dispatch by the name 
   const expected = {
     prepare: ["ideaType", "op"],
     reserve: ["ideaType", "offered", "op", "pick"],
-    complete: ["draftArtifactId", "ideaArtifactId", "ideaType", "op", "reviewTargets"],
+    complete: ["claimId", "draftArtifactId", "ideaArtifactId", "ideaType", "op", "reviewTargets"],
   };
   for (const [op, fields] of Object.entries(expected)) {
     const found = storedIdeasNodes(op);
@@ -625,4 +625,29 @@ test("the picture is filed, and the review's set names it after the post", () =>
     ),
     "and so does its revision",
   );
+});
+
+
+test("claims keep one active idea across reserved and drafted without changing legacy data", () => {
+  const claim = manifest.cinatra.declaredTables.find((table) => table.name === "idea_claims");
+  assert.ok(claim);
+  assert.equal(claim.organizationColumn, "org_id");
+  assert.equal(claim.runColumn, "run_id");
+  const id = claim.columns.find((column) => column.name === "claim_id");
+  assert.equal(id.type, "uuid");
+  assert.equal(id.primaryKey, true);
+  assert.equal(id.default, "gen_random_uuid()");
+  const key = claim.columns.find((column) => column.name === "active_idea_key");
+  assert.ok(!key.notNull, "released history permits multiple null keys");
+  assert.deepEqual(claim.indexes.find((index) => index.unique).columns, ["org_id", "active_idea_key"]);
+  assert.equal(manifest.cinatra.migrationsDir, "./cinatra/migrations");
+  assert.ok(manifest.files.includes("cinatra"));
+});
+
+test("the DB claim identity travels from reservation to this completion", () => {
+  const edge = edgeInto("complete_relation", "claimId");
+  assert.equal(edge.source_node.$component_ref, "reserve_idea");
+  assert.equal(edge.source_output, "claimId");
+  assert.ok(parts.reserve_idea.outputs.some((field) => field.title === "claimId" && field.type === "string"));
+  assert.equal(parts.complete_relation.data.input.input.claimId, "{{ claimId }}");
 });
