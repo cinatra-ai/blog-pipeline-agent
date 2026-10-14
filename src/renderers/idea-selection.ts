@@ -209,6 +209,41 @@ export function tabbableIdeaIndex(selectedIndex: number | null, count: number): 
 }
 
 /**
+ * The position of the chosen idea among the offered `ideas`: the idea whose
+ * reference was committed as `chosenJson`; null while nothing is chosen and
+ * when the chosen idea is no longer offered.
+ */
+export function chosenIdeaIndex(
+  ideas: ReadonlyArray<Record<string, unknown>>,
+  chosenJson: string | null,
+): number | null {
+  if (chosenJson === null) return null;
+  const idx = ideas.findIndex((idea) => {
+    const reference = choiceReference(idea);
+    return reference !== null && JSON.stringify(reference) === chosenJson;
+  });
+  return idx === -1 ? null : idx;
+}
+
+/**
+ * The radio a key press moves the choice and the focus to from the radio at
+ * `current` in a group of `count`; null when the key moves nothing: the step
+ * is disabled, the key is no navigation key, or the key lands on the radio it
+ * was pressed on (Home on the first, End on the last, any key in a group of
+ * one).
+ */
+export function ideaKeyMove(
+  current: number,
+  count: number,
+  key: string,
+  disabled: boolean,
+): number | null {
+  if (disabled) return null;
+  const target = nextIdeaIndex(current, count, key);
+  return target === null || target === current ? null : target;
+}
+
+/**
  * Radio-per-idea chooser. Commits `JSON.stringify({artifactId,
  * representationRevisionId})` into { selectedIdeaJson, userResponse } — and only
  * ever in response to a person choosing.
@@ -222,14 +257,16 @@ function IdeaChooser({
   onChange: (next: unknown) => unknown;
   disabled?: boolean;
 }) {
-  // No index: nothing is chosen until someone chooses.
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  // Nothing is chosen until someone chooses. The choice is the reference it
+  // committed, so it stays with its idea when the offered ideas change.
+  const [chosenJson, setChosenJson] = useState<string | null>(null);
+  const selectedIndex = chosenIdeaIndex(ideas, chosenJson);
   const choose = (idx: number) => {
     if (disabled || idx === selectedIndex) return;
-    setSelectedIndex(idx);
     const reference = choiceReference(ideas[idx]);
     if (!reference) return;
     const json = JSON.stringify(reference);
+    setChosenJson(json);
     void onChange({ selectedIdeaJson: json, userResponse: json });
   };
   // One radio of the group is reachable by Tab: the chosen one, else the first.
@@ -237,8 +274,7 @@ function IdeaChooser({
   // radio of that idea inside the same radio group.
   const tabbableIndex = tabbableIdeaIndex(selectedIndex, ideas.length);
   const moveFrom = (idx: number, event: KeyboardEvent<HTMLButtonElement>) => {
-    if (disabled) return;
-    const target = nextIdeaIndex(idx, ideas.length, event.key);
+    const target = ideaKeyMove(idx, ideas.length, event.key, disabled === true);
     if (target === null) return;
     event.preventDefault();
     choose(target);

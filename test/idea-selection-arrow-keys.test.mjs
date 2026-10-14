@@ -26,6 +26,19 @@ async function theHelper() {
   return mod.nextIdeaIndex;
 }
 
+const NAVIGATION_KEYS = ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"];
+
+/** The JSON a choice of `idea` commits: its reference, artifact first. */
+function committed(idea) {
+  return JSON.stringify({ artifactId: idea.artifactId, representationRevisionId: idea.representationRevisionId });
+}
+
+async function theKeyMove() {
+  const mod = await import(ENTRY_URL.href);
+  assert.equal(typeof mod.ideaKeyMove, "function", "the module exports ideaKeyMove");
+  return mod.ideaKeyMove;
+}
+
 describe("the idea step's radio group moves with the arrow keys (cinatra#3773)", () => {
   it("ArrowDown and ArrowRight move to the next idea and wrap from the last to the first", async () => {
     const nextIdeaIndex = await theHelper();
@@ -86,5 +99,63 @@ describe("the idea step's radio group moves with the arrow keys (cinatra#3773)",
     assert.equal(mod.tabbableIdeaIndex(2, 3), 2);
     assert.equal(mod.tabbableIdeaIndex(2, 2), 0);
     assert.equal(mod.tabbableIdeaIndex(5, 2), 0);
+  });
+
+  it("the chosen idea keeps its radio when the offered ideas shrink or reorder", async () => {
+    const mod = await import(ENTRY_URL.href);
+    assert.equal(typeof mod.chosenIdeaIndex, "function", "the module exports chosenIdeaIndex");
+    const [first, second, third] = IDEAS;
+    assert.equal(mod.chosenIdeaIndex(IDEAS, null), null);
+    assert.equal(mod.chosenIdeaIndex(IDEAS, committed(second)), 1);
+    assert.equal(mod.chosenIdeaIndex([first, third], committed(third)), 1);
+    assert.equal(mod.chosenIdeaIndex([third, first], committed(third)), 0);
+    assert.equal(mod.chosenIdeaIndex([first, third], committed(first)), 0);
+  });
+
+  it("a chosen idea that is no longer offered marks no radio, and Tab reaches the first", async () => {
+    const mod = await import(ENTRY_URL.href);
+    assert.equal(typeof mod.chosenIdeaIndex, "function", "the module exports chosenIdeaIndex");
+    const [first, second, third] = IDEAS;
+    const gone = mod.chosenIdeaIndex([first, third], committed(second));
+    assert.equal(gone, null);
+    assert.equal(mod.tabbableIdeaIndex(gone, 2), 0);
+    const otherRevision = { ...second, representationRevisionId: "idea-revision-second-later" };
+    assert.equal(mod.chosenIdeaIndex([first, otherRevision, third], committed(second)), null);
+  });
+
+  it("a key that lands on the radio it was pressed on moves nothing", async () => {
+    const ideaKeyMove = await theKeyMove();
+    assert.equal(ideaKeyMove(0, 3, "Home", false), null);
+    assert.equal(ideaKeyMove(2, 3, "End", false), null);
+    for (const key of NAVIGATION_KEYS) {
+      assert.equal(ideaKeyMove(0, 1, key, false), null, "one radio, " + key);
+    }
+  });
+
+  it("a disabled step moves nothing on any key", async () => {
+    const ideaKeyMove = await theKeyMove();
+    for (const current of [0, 1, 2]) {
+      for (const key of NAVIGATION_KEYS) {
+        assert.equal(ideaKeyMove(current, 3, key, true), null, key + " from " + current);
+      }
+    }
+  });
+
+  it("a navigation key moves to the idea nextIdeaIndex names when it is another radio, and any other key moves nothing", async () => {
+    const mod = await import(ENTRY_URL.href);
+    const ideaKeyMove = await theKeyMove();
+    for (const current of [0, 1, 2]) {
+      for (const key of NAVIGATION_KEYS) {
+        const named = mod.nextIdeaIndex(current, 3, key);
+        assert.equal(ideaKeyMove(current, 3, key, false), named === current ? null : named, key + " from " + current);
+      }
+      for (const key of ["Tab", "Enter", " ", "Escape", "PageDown", "a"]) {
+        assert.equal(ideaKeyMove(current, 3, key, false), null, JSON.stringify(key) + " from " + current);
+      }
+    }
+    assert.equal(ideaKeyMove(1, 3, "ArrowDown", false), 2);
+    assert.equal(ideaKeyMove(0, 3, "ArrowUp", false), 2);
+    assert.equal(ideaKeyMove(2, 3, "Home", false), 0);
+    assert.equal(ideaKeyMove(0, 3, "End", false), 2);
   });
 });
