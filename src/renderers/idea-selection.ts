@@ -1,6 +1,6 @@
 "use client";
 
-import { createElement, Fragment, useState } from "react";
+import { createElement, Fragment, useState, type KeyboardEvent } from "react";
 
 // The idea step's own renderer (cinatra#3035). The one field-renderer binding
 // this pack declares names this module as its `component.entry`, so the runtime
@@ -178,6 +178,72 @@ export default function BlogIdeaSelectionRenderer(props: IdeaSelectionProps) {
 }
 
 /**
+ * The idea a key moves to from the radio at `current` in a group of `count`:
+ * ArrowDown and ArrowRight the next, ArrowUp and ArrowLeft the previous (both
+ * wrap at the ends), Home the first and End the last; null for any other key.
+ */
+export function nextIdeaIndex(current: number, count: number, key: string): number | null {
+  if (count <= 0) return null;
+  switch (key) {
+    case "ArrowDown":
+    case "ArrowRight":
+      return (current + 1) % count;
+    case "ArrowUp":
+    case "ArrowLeft":
+      return (current - 1 + count) % count;
+    case "Home":
+      return 0;
+    case "End":
+      return count - 1;
+    default:
+      return null;
+  }
+}
+
+/**
+ * The radio Tab reaches in a group of `count`: the chosen one while it is one of
+ * the group's radios, else the first.
+ */
+export function tabbableIdeaIndex(selectedIndex: number | null, count: number): number {
+  return selectedIndex !== null && selectedIndex >= 0 && selectedIndex < count ? selectedIndex : 0;
+}
+
+/**
+ * The position of the chosen idea among the offered `ideas`: the idea whose
+ * reference was committed as `chosenJson`; null while nothing is chosen and
+ * when the chosen idea is no longer offered.
+ */
+export function chosenIdeaIndex(
+  ideas: ReadonlyArray<Record<string, unknown>>,
+  chosenJson: string | null,
+): number | null {
+  if (chosenJson === null) return null;
+  const idx = ideas.findIndex((idea) => {
+    const reference = choiceReference(idea);
+    return reference !== null && JSON.stringify(reference) === chosenJson;
+  });
+  return idx === -1 ? null : idx;
+}
+
+/**
+ * The radio a key press moves the choice and the focus to from the radio at
+ * `current` in a group of `count`; null when the key moves nothing: the step
+ * is disabled, the key is no navigation key, or the key lands on the radio it
+ * was pressed on (Home on the first, End on the last, any key in a group of
+ * one).
+ */
+export function ideaKeyMove(
+  current: number,
+  count: number,
+  key: string,
+  disabled: boolean,
+): number | null {
+  if (disabled) return null;
+  const target = nextIdeaIndex(current, count, key);
+  return target === null || target === current ? null : target;
+}
+
+/**
  * Radio-per-idea chooser. Commits `JSON.stringify({artifactId,
  * representationRevisionId})` into { selectedIdeaJson, userResponse } — and only
  * ever in response to a person choosing.
@@ -191,15 +257,29 @@ function IdeaChooser({
   onChange: (next: unknown) => unknown;
   disabled?: boolean;
 }) {
-  // No index: nothing is chosen until someone chooses.
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  // Nothing is chosen until someone chooses. The choice is the reference it
+  // committed, so it stays with its idea when the offered ideas change.
+  const [chosenJson, setChosenJson] = useState<string | null>(null);
+  const selectedIndex = chosenIdeaIndex(ideas, chosenJson);
   const choose = (idx: number) => {
     if (disabled || idx === selectedIndex) return;
-    setSelectedIndex(idx);
     const reference = choiceReference(ideas[idx]);
     if (!reference) return;
     const json = JSON.stringify(reference);
+    setChosenJson(json);
     void onChange({ selectedIdeaJson: json, userResponse: json });
+  };
+  // One radio of the group is reachable by Tab: the chosen one, else the first.
+  // The arrow keys, Home and End choose another idea and move the focus to the
+  // radio of that idea inside the same radio group.
+  const tabbableIndex = tabbableIdeaIndex(selectedIndex, ideas.length);
+  const moveFrom = (idx: number, event: KeyboardEvent<HTMLButtonElement>) => {
+    const target = ideaKeyMove(idx, ideas.length, event.key, disabled === true);
+    if (target === null) return;
+    event.preventDefault();
+    choose(target);
+    const group = event.currentTarget.closest('[role="radiogroup"]');
+    group?.querySelectorAll<HTMLElement>('[role="radio"]')[target]?.focus();
   };
   return createElement(
     "div",
@@ -231,8 +311,10 @@ function IdeaChooser({
               "aria-checked": selected ? "true" : "false",
               "data-state": selected ? "checked" : "unchecked",
               disabled,
+              tabIndex: idx === tabbableIndex ? 0 : -1,
               className: `${RADIO_ITEM_CLASSES} mt-1 relative`,
               onClick: () => choose(idx),
+              onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => moveFrom(idx, event),
             },
             selected
               ? createElement(
