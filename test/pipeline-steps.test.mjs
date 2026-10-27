@@ -333,12 +333,15 @@ test("the end node binds nothing: everything the run makes is written while it r
 // ---------------------------------------------------------------------------
 
 test("the pipeline has exactly the four pauses of its own that the walk describes", () => {
-  // The rail a person reads is the pipeline's declared pauses, in the walk's
-  // order: the idea, the brand voice the post is written in, the review of what
-  // the run made, and the LinkedIn post.
+  // The rail a person reads is the pipeline's declared pauses: the brand voice
+  // the post is written in, the idea, the review of what the run made, and the
+  // LinkedIn post. The brand-voice pause is the flow's declared context slot
+  // (cinatra#4314): the host puts its list step in front of the run, so the
+  // file carries the declaration, and the other three are gates of this flow.
+  const slots = oas.metadata.cinatra.contextSlots ?? [];
+  assert.deepEqual(slots.map((s) => s.slotId), ["brandVoice"]);
   assert.deepEqual(nodesOfType("InputMessageNode"), [
     "idea_selection_gate",
-    "brand_voice_gate",
     "draft_review_gate",
     "linkedin_review_gate",
   ]);
@@ -350,38 +353,30 @@ test("the pipeline has exactly the four pauses of its own that the walk describe
 
 test("the run parks for the brand-voice pick before any draft is written", () => {
   // Plan (C) section 6: one pause for brand voice, before the draft. The pause
-  // is a gate of this flow's own, shaped like the other three so the host draws
-  // it as a rail entry.
-  const gate = parts.brand_voice_gate;
-  assert.ok(gate, "the flow declares the brand-voice pause");
-  assert.equal(gate.component_type, "InputMessageNode", "a gate the runner parks on");
-  assert.equal(gate.metadata.cinatra.requiresApproval, true);
-  assert.equal(gate.metadata.cinatra.riskClass, "read_only");
-  assert.ok(gate.metadata.cinatra.a2uiSurfaceId, "the host is told which surface draws it");
-  assert.ok(at("reserve_idea") < at("brand_voice_gate"), "the idea is taken first");
-  assert.ok(at("brand_voice_gate") < at("draft_flow"), "the voice is picked before the writer runs");
-  assert.ok(at("brand_voice_gate") < at("write_draft"), "and nothing is written before the pick");
-  const schema = gate.metadata.cinatra.inputMessageSchema;
-  assert.ok(
-    schema.properties.brandVoice,
-    "the brand-voice material is the thing the gate asks a person to pick",
-  );
-  const out = gate.outputs.find((o) => o.title === "brandVoice");
-  assert.ok(out, "and the pick leaves the gate as its own output");
-  assert.equal(out.default, "", "an unanswered pick is an empty voice, not a dead end");
+  // is the flow's declared brand-voice slot; the host injects its list step
+  // directly after the start, so it parks the run before the idea, the writer
+  // and every write (cinatra-ai/cinatra#4314; test/brand-voice-pick-3035).
+  const slot = (oas.metadata.cinatra.contextSlots ?? []).find((s) => s.slotId === "brandVoice");
+  assert.ok(slot, "the flow declares the brand-voice pause");
+  assert.equal(slot.selectionMode, "interactive", "a person picks; nothing is picked for them");
+  assert.equal(parts.brand_voice_gate, undefined, "the free-text pause is gone");
+  assert.ok(at("start") < at("draft_flow") && at("start") < at("write_draft"));
 });
 
 test("the brand-voice pick is handed down to the writing step", () => {
-  // "One brand-voice pick handed down": the writer declares `voice` and, until
-  // this edge, nothing in the run ever filled it — every post was drafted with
-  // no voice at all.
-  const edge = edgeInto("draft_flow", "voice");
-  assert.ok(edge, "the draft writer's voice input is fed by the run");
-  assert.equal(edge.source_node.$component_ref, "brand_voice_gate", "by the pick a person made");
-  assert.equal(edge.source_output, "brandVoice");
-  const writer = parts[parts.draft_flow.subflow.$component_ref];
-  const declared = (writer.inputs ?? []).map((i) => i.title);
-  assert.ok(declared.includes("voice"), "and the writer really takes it");
+  // "One brand-voice pick handed down": the writer's own brand-voice slot is
+  // satisfied by the pipeline's pick, and no free text reaches its `voice`.
+  const lines = oas.metadata.cinatra.parentSatisfiedContextSlots ?? [];
+  assert.ok(
+    lines.some(
+      (l) =>
+        l.parentSlotId === "brandVoice" &&
+        l.childPackage === "@cinatra-ai/blog-draft-writer-agent" &&
+        l.childSlotId === "brandVoice",
+    ),
+    "the writer's brand-voice slot is satisfied by the pipeline's pick",
+  );
+  assert.equal(edgeInto("draft_flow", "voice"), undefined, "the pause hands the writer no voice text");
 });
 
 test("each pause is declared where a person reads what the pipeline does", () => {
@@ -554,9 +549,11 @@ test("every road from the start to the end passes the four pauses, in the walk's
     if (!next.has(from)) next.set(from, []);
     next.get(from).push(edge.to_node.$component_ref);
   }
+  // The brand-voice pause is the declared slot the host puts directly after
+  // the start (see above), so every road meets it first; these are the three
+  // gates of this flow's own graph.
   const gates = [
     "idea_selection_gate",
-    "brand_voice_gate",
     "draft_review_gate",
     "linkedin_review_gate",
   ];
@@ -579,14 +576,13 @@ test("every road from the start to the end passes the four pauses, in the walk's
     for (let i = 0; i < gates.length; i += 1) {
       assert.notEqual(seen[i], -1, `the road ${road.join("->")} skips ${gates[i]}`);
     }
-    assert.ok(seen[0] < seen[1], "the idea is chosen before the voice is picked");
-    assert.ok(seen[1] < seen[2], "the voice is picked before the draft is reviewed");
-    assert.ok(seen[2] < seen[3], "the draft is reviewed before the LinkedIn post is approved");
+    assert.ok(seen[0] < seen[1], "the idea is chosen before the draft is reviewed");
+    assert.ok(seen[1] < seen[2], "the draft is reviewed before the LinkedIn post is approved");
     // the preparation, the write and the picture are on every road too, and in order
     for (const [before, after] of [
       ["prepare_ideas", "idea_selection_gate"],
-      ["brand_voice_gate", "draft_flow"],
-      ["brand_voice_gate", "write_draft"],
+      ["reserve_idea", "draft_flow"],
+      ["reserve_idea", "write_draft"],
       ["write_draft", "image_flow"],
       ["image_flow", "draft_review_gate"],
     ]) {

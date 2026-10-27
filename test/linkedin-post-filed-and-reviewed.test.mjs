@@ -167,8 +167,10 @@ test("the end node binds nothing: the LinkedIn post is filed during the run, not
     [],
     "no flow output carries a binding",
   );
-  assert.deepEqual(endOutputs.map((o) => o.title).sort(), ["linkedinPost", "linkedinTitle"]);
-  assert.deepEqual(oas.outputs.map((o) => o.title).sort(), ["linkedinPost", "linkedinTitle"]);
+  // Beside the LinkedIn post, the run reports only the brand voice it was
+  // written in (the pipeline's one brand-voice pick, cinatra-ai/cinatra#4314).
+  assert.deepEqual(endOutputs.map((o) => o.title).sort(), ["brandVoiceContextSlotBindings", "linkedinPost", "linkedinTitle"]);
+  assert.deepEqual(oas.outputs.map((o) => o.title).sort(), ["brandVoiceContextSlotBindings", "linkedinPost", "linkedinTitle"]);
 });
 
 /** Ports that record every data call and every filing. */
