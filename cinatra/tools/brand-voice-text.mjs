@@ -32,6 +32,17 @@
  * listing does not hold stops the run as a brand voice that cannot be read. Its
  * text is never read.
  *
+ * THE READ NAMES THE TYPE TOO. The listing and the content read are two calls,
+ * and a typed promotion can retype the artifact between them to another type
+ * this pack declares, which the content read also admits. So the content read
+ * names the brand-voice type (`objectType`). The host then refuses a row of any
+ * other type on the same row read that picks the revision it reads, and the
+ * module stops the run as not a brand voice. The read also answers the type of
+ * the row it read, and the module returns the text only when that answer is the
+ * brand-voice type: another type stops the run as not a brand voice, and an
+ * answer with no type (a host that does not check the named type) is thrown on
+ * as a failure. Text of another type is never returned as the brand voice.
+ *
  * KNOWN LIMIT: ONE PAGE OF THE LISTING. The module reads the first page of the
  * listing only (up to 500 brand voices, the host's page ceiling, newest first)
  * and does not ask for the next page. The first page can hold fewer than 500
@@ -48,11 +59,11 @@
  * sentence below, before anything is written.
  *
  * A FAILURE IS NOT A PICK TO CHANGE. Only the content read's own refusal of the
- * picked artifact, or a pick the first page of the listing does not hold,
- * becomes a sentence that asks for another brand voice. Any other error (a
- * failed listing, a store fault, a refusal of this pack's declaration) is
- * thrown on as it is, so the host answers it as the failure it is and never as
- * the person's choice.
+ * picked artifact, a read that answers another type, or a pick the first page
+ * of the listing does not hold, becomes a sentence that asks for another brand
+ * voice. Any other error (a failed listing, a store fault, a refusal of this
+ * pack's declaration, a read that answers no type) is thrown on as it is, so
+ * the host answers it as the failure it is and never as the person's choice.
  *
  * The bindings arrive as JSON text (a step that a parent hands the pick to gets
  * it on a text input) or, in a flow's own graph, as the list itself. Both are
@@ -106,10 +117,12 @@ export const REFUSAL_SENTENCES = Object.freeze([
  *  the sentence, which the host repeats. */
 const REFUSAL_NAME = "ExtensionToolCallRefusal";
 
-/** The content read's own refusal, by the name its class sets, and its reason
- *  for a representation that is not text. */
+/** The content read's own refusal, by the name its class sets, its reason for a
+ *  representation that is not text, and its reason for a row that is not of the
+ *  type the read names. */
 const CONTENT_REFUSAL_NAME = "ArtifactContentRefusal";
 const NOT_TEXT = "not-text";
+const TYPE_MISMATCH = "type-mismatch";
 
 class BrandVoiceRefusal extends Error {
   constructor(sentence) {
@@ -202,16 +215,23 @@ export async function extensionTool({ input, ports }) {
       ...("representationRevisionId" in ref
         ? { representationRevisionId: ref.representationRevisionId }
         : {}),
+      objectType: BRAND_VOICE_TYPE,
     });
   } catch (e) {
     if (typeof e === "object" && e !== null && e.name === CONTENT_REFUSAL_NAME) {
+      if (e.reason === TYPE_MISMATCH) throw new BrandVoiceRefusal(NOT_A_BRAND_VOICE_REASON);
       throw new BrandVoiceRefusal(e.reason === NOT_TEXT ? PDF_REASON : UNREADABLE_REASON);
     }
     throw e;
   }
-  if (!isPlainObject(read) || typeof read.text !== "string") {
-    throw new BrandVoiceRefusal(UNREADABLE_REASON);
+  if (!isPlainObject(read)) throw new BrandVoiceRefusal(UNREADABLE_REASON);
+  // The type of the row the host read. No type is a host that did not check
+  // the named type: a failure, never a brand voice and never the person's pick.
+  if (typeof read.objectType !== "string") {
+    throw new Error("brand_voice_text: the content read did not answer the type it read");
   }
+  if (read.objectType !== BRAND_VOICE_TYPE) throw new BrandVoiceRefusal(NOT_A_BRAND_VOICE_REASON);
+  if (typeof read.text !== "string") throw new BrandVoiceRefusal(UNREADABLE_REASON);
   if (read.truncated === true) throw new BrandVoiceRefusal(TOO_LONG_REASON);
   if (read.text.trim() === "") throw new BrandVoiceRefusal(EMPTY_REASON);
   return { brandVoiceText: read.text };
