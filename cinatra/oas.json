@@ -241,7 +241,7 @@
     },
     {
       "component_type": "ControlFlowEdge",
-      "id": "reserve_idea->brand_voice_gate",
+      "id": "reserve_idea->draft_flow",
       "name": "reserve_idea->draft_flow",
       "description": "",
       "metadata": {},
@@ -2072,32 +2072,7 @@
             },
             {
               "title": "brandVoiceContextSlotBindings",
-              "type": "array",
-              "json_schema": {
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "artifactId": {
-                      "type": "string"
-                    },
-                    "representationRevisionId": {
-                      "type": "string"
-                    },
-                    "semanticAssertionId": {
-                      "type": "string"
-                    },
-                    "extension": {
-                      "type": "string"
-                    },
-                    "sourceScope": {
-                      "type": "string"
-                    },
-                    "ownerId": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
+              "type": "string"
             }
           ],
           "outputs": [
@@ -3418,32 +3393,7 @@
             },
             {
               "title": "brandVoiceContextSlotBindings",
-              "type": "array",
-              "json_schema": {
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "artifactId": {
-                      "type": "string"
-                    },
-                    "representationRevisionId": {
-                      "type": "string"
-                    },
-                    "semanticAssertionId": {
-                      "type": "string"
-                    },
-                    "extension": {
-                      "type": "string"
-                    },
-                    "sourceScope": {
-                      "type": "string"
-                    },
-                    "ownerId": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
+              "type": "string"
             }
           ],
           "outputs": [

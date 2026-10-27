@@ -1,18 +1,18 @@
 # Blog Pipeline Agent
 
-Turns one blog idea your organisation already holds into a finished post with its featured image and the LinkedIn post that announces it. You give a brief, pick the brand voice the post is written in from the brand voices your organisation stores, pick one idea no draft has used yet, wait while the post and its picture are made, review the post while the run waits, and approve the LinkedIn post.
+Turns one blog idea your organisation already holds into a finished post with its featured image and the LinkedIn post that announces it. You give a brief, pick a stored brand voice, pick one idea no draft has used yet, wait while the post and its picture are made, review the post, and approve the LinkedIn post.
 
 **Install:** find Blog Pipeline Agent in the marketplace and add it to your workspace. No credentials are required; the agent uses the Cinatra platform to call its child agents.
 
 **Configuration:** pass a `brief` (required) plus optional `audience`, `tone` (default: informative), `length` (default: medium), `referenceContent` and `ideaCount` (default: 5). `companyUrl`, `blogPostUrl`, `projectId` and `cinatra_run_id` are set by the platform and are not shown.
 
-**API contract:** inputs — `brief` (required), `audience`, `tone`, `length`, `referenceContent`, `ideaCount`, `companyUrl`, `blogPostUrl`, `projectId`, `cinatra_run_id`; outputs — `linkedinPost`, `linkedinTitle`, and `brandVoiceContextSlotBindings` (the brand voice the run was written in). The post is written while the run is going, so it is an artifact of its own and not a run output.
+**API contract:** inputs — `brief` (required), `audience`, `tone`, `length`, `referenceContent`, `ideaCount`, `companyUrl`, `blogPostUrl`, `projectId`, `cinatra_run_id`; outputs — `linkedinPost`, `linkedinTitle`, `brandVoiceContextSlotBindings` (the brand voice used). The post is written during the run as an artifact of its own, not a run output.
 
 **Development:** run `node extension-kind-gate.mjs`, `node renderer-binding-gate.mjs` and `npm test` before publishing.
 
-**Review:** the run pauses four times — to pick the brand voice the post is written in (one of your stored brand voices, exactly one, nothing picked for you), to pick an idea, to review what the run made, and to approve the LinkedIn post. The middle pause names the revisions the run minted, so the review opens on exactly those, one per thing, and the run waits until the last is decided. This flow owns the pause, not the decision.
+**Review:** the run pauses four times — to pick one stored brand voice (none is preselected), to pick an idea, to review what the run made, and to approve the LinkedIn post. The middle pause names the revisions the run minted, so the review opens on exactly those, one per thing, and the run waits until the last is decided. This flow owns the pause, not the decision.
 
-**Troubleshooting:** a run stopping at the idea step with a sentence instead of a list has no idea left to draft — every stored idea has a draft or is reserved; generate new ideas and start again. A run sitting at the review is the pause doing its job: decide the review card, then continue.
+**Troubleshooting:** a run stopping at the idea step with a sentence instead of a list has no idea left to draft — every stored idea has a draft or is reserved; generate new ideas and start again. A run sitting at the review is waiting: decide the review card, then continue.
 
 ## Works with
 
@@ -21,7 +21,7 @@ Turns one blog idea your organisation already holds into a finished post with it
 ## Capabilities
 
 - Offer the blog ideas no draft has used, and reserve the one you pick
-- Ask once for the brand voice the post is written in, as a list of your stored brand voices, and hand that one pick to the writer and to the featured image
+- Ask once for a stored brand voice and hand it to the writer and the image
 - Draft it into a markdown post, written as an artifact while the run is going
 - Make the post's featured image
 - Open the review on exactly the revisions the run made, and wait there
