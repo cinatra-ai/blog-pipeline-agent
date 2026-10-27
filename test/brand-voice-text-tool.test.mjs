@@ -13,6 +13,11 @@
  * the module cannot read. The same file runs in
  * blog-draft-writer-agent, blog-image-generator-agent and blog-pipeline-agent.
  *
+ * The ports answer in the host's own shapes: the listing admits only the object
+ * type the brand-voice package declares and refuses any other type outright,
+ * and each listed row is a summary as the host's listing projects it, whose
+ * `objectType` is the type and whose `artifactType` is the stored form.
+ *
  *   node --test test/brand-voice-text-tool.test.mjs
  */
 import { test } from "node:test";
@@ -26,8 +31,13 @@ const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 
 const TOOL_NAME = "brand_voice_text";
 const MODULE_PATH = "./cinatra/tools/brand-voice-text.mjs";
+/** The brand-voice PACKAGE: the dependency edge, and the `extension` of a ref. */
 const BRAND_VOICE = "@cinatra-ai/brand-voice-artifact";
+/** The OBJECT TYPE that package declares (its manifest's `objectTypes`): the
+ *  one type the host lists and admits a brand voice by. */
+const BRAND_VOICE_TYPE = "@cinatra-ai/brand-voice:guide";
 const BLOG_IDEA = "@cinatra-ai/blog-idea-artifact";
+const BLOG_IDEA_TYPE = "@cinatra-ai/blog-idea-artifact:blog-idea";
 const REFUSAL_NAME = "ExtensionToolCallRefusal";
 
 const PDF = "This brand voice is a PDF; pick a text brand voice.";
@@ -38,6 +48,10 @@ const MORE_THAN_ONE = "More than one brand voice was picked; pick exactly one br
 const NOT_A_BRAND_VOICE = "The chosen item is not a brand voice; pick a brand voice.";
 const NO_BINDING = "The brand voice for this run did not reach this step; start the run again.";
 const ALL_SENTENCES = [PDF, UNREADABLE, TOO_LONG, EMPTY, MORE_THAN_ONE, NOT_A_BRAND_VOICE, NO_BINDING];
+
+/** The one listing request the module makes: the brand-voice type, one page of
+ *  up to 500. */
+const FIRST_PAGE_REQUEST = { types: [BRAND_VOICE_TYPE], limit: 500 };
 
 /** The module, loaded per case. A module that is not shipped fails each case on
  *  an assertion, not on an import error. */
@@ -52,7 +66,8 @@ async function tool() {
   return (await loaded()).extensionTool;
 }
 
-/** A ref as the host's context finalize hands it down. */
+/** A ref as the host's context finalize hands it down: `extension` names the
+ *  package whose assertion made it a brand voice. */
 const REF = { artifactId: "art-1", representationRevisionId: "rev-1", extension: BRAND_VOICE, sourceScope: "organization" };
 const binding = (refs) => [{ slotId: "brandVoice", refs }];
 
@@ -64,12 +79,54 @@ function contentRefusal(reason) {
   return e;
 }
 
-const REF_LISTED = { artifactId: "art-1", artifactType: BRAND_VOICE };
+/** The host's own refusal of a type the pack does not declare, as its class
+ *  names itself. */
+function admissionRefusal(type) {
+  return Object.assign(new Error(`artifact reads: "${type}" is not a declared dependency`), {
+    name: "ArtifactAdmissionRefusal",
+    reason: "artifact-type-not-a-declared-dependency",
+    objectType: type,
+  });
+}
+
+/** One row of the host's listing, every field the host's summary carries, as it
+ *  projects a stored row: `objectType` is the object type, and `artifactType`
+ *  is the stored form ("file"), never a type. */
+function summary(artifactId, objectType = BRAND_VOICE_TYPE) {
+  return {
+    artifactId,
+    latestRepresentationRevisionId: "rev-1",
+    objectType,
+    artifactType: "file",
+    title: "Brand voice",
+    mime: "text/markdown",
+    size: 24,
+    originKind: "upload",
+    createdAt: "2026-10-01T00:00:00.000Z",
+    updatedAt: "2026-10-01T00:00:00.000Z",
+    ownerLevel: "organization",
+    visibility: "organization",
+    ownerId: null,
+    organizationId: "org-1",
+    projectId: null,
+    eligibleExtensions: [],
+    primaryExtension: null,
+    effectiveIdentity: { kind: "no-primary" },
+    presentationIdentity: { kind: "no-primary" },
+    presentationSuggestions: [],
+    sourceUrl: null,
+  };
+}
+
+const REF_LISTED = summary("art-1");
+/** A last page: it holds the pick and offers no next page. */
 const LISTED = { artifacts: [REF_LISTED] };
 
-/** Ports with a content read that answers `answer` and a brand-voice listing
- *  that answers `listing` (each a value, or a function that throws), and that
- *  record each call. */
+/** Ports with a content read that answers `answer` and a listing that answers
+ *  `listing` (each a value, or a function that throws), and that record each
+ *  call. The listing admits only the brand-voice type, as the host's listing
+ *  admits only the types the pack's declared dependencies own: a request that
+ *  names any other type is refused outright, and nothing is listed. */
 function portsWith(answer, listing = LISTED) {
   const calls = [];
   const lists = [];
@@ -80,6 +137,9 @@ function portsWith(answer, listing = LISTED) {
       artifacts: {
         async list(request) {
           lists.push(request);
+          for (const type of request?.types ?? []) {
+            if (type !== BRAND_VOICE_TYPE) throw admissionRefusal(type);
+          }
           return typeof listing === "function" ? listing(request) : listing;
         },
         async contentRead(request) {
@@ -96,16 +156,22 @@ const TEXT = { artifactId: "art-1", representationRevisionId: "rev-1", mime: "te
 /** Every sentence a case below saw the module stop a run with. */
 const seenSentences = new Set();
 
-async function refusalOf(input, answer = TEXT, listing = LISTED) {
+/** One call of the tool: its result or its error, and the calls it made. */
+async function outcomeOf(input, answer = TEXT, listing = LISTED) {
   const extensionTool = await tool();
   const { calls, lists, ports } = portsWith(answer, listing);
   try {
-    await extensionTool({ input, ports });
+    return { out: await extensionTool({ input, ports }), calls, lists };
   } catch (e) {
     if (e?.name === REFUSAL_NAME) seenSentences.add(e.message);
     return { error: e, name: e?.name, message: e?.message, calls, lists };
   }
-  assert.fail(`no refusal for ${JSON.stringify(input)}`);
+}
+
+async function refusalOf(input, answer = TEXT, listing = LISTED) {
+  const r = await outcomeOf(input, answer, listing);
+  if (!("error" in r)) assert.fail(`no refusal for ${JSON.stringify(input)}`);
+  return r;
 }
 
 test("the manifest declares the tool as one { name, module } entry", () => {
@@ -134,111 +200,145 @@ test("the shipped files carry the module", () => {
 });
 
 test("the one picked brand voice comes back as its text, from the JSON text a parent hands down", async () => {
-  const extensionTool = await tool();
-  const { calls, lists, ports } = portsWith(TEXT);
-  const out = await extensionTool({ input: { bindings: JSON.stringify(binding([REF])) }, ports });
-  assert.deepEqual(out, { brandVoiceText: "Short, direct sentences." });
-  assert.deepEqual(calls, [{ artifactId: "art-1", representationRevisionId: "rev-1" }]);
-  assert.deepEqual(lists, [{ types: [BRAND_VOICE], limit: 500 }], "the brand-voice listing is asked first");
+  const r = await outcomeOf({ bindings: JSON.stringify(binding([REF])) });
+  assert.deepEqual(r.lists, [FIRST_PAGE_REQUEST], "the listing is asked first, for the brand-voice object type");
+  assert.equal(r.error, undefined, "no error");
+  assert.deepEqual(r.out, { brandVoiceText: "Short, direct sentences." });
+  assert.deepEqual(r.calls, [{ artifactId: "art-1", representationRevisionId: "rev-1" }]);
 });
 
 test("the list form of the bindings is read the same way", async () => {
-  const extensionTool = await tool();
-  const { calls, ports } = portsWith(TEXT);
-  const out = await extensionTool({ input: { bindings: binding([REF]) }, ports });
-  assert.deepEqual(out, { brandVoiceText: "Short, direct sentences." });
-  assert.equal(calls.length, 1);
+  const r = await outcomeOf({ bindings: binding([REF]) });
+  assert.equal(r.error, undefined, "no error");
+  assert.deepEqual(r.out, { brandVoiceText: "Short, direct sentences." });
+  assert.equal(r.calls.length, 1);
 });
 
 test("a ref without a revision reads the artifact's latest text", async () => {
-  const extensionTool = await tool();
-  const { calls, ports } = portsWith(TEXT);
-  await extensionTool({ input: { bindings: binding([{ artifactId: "art-1", extension: BRAND_VOICE }]) }, ports });
-  assert.deepEqual(calls, [{ artifactId: "art-1" }]);
+  const r = await outcomeOf({ bindings: binding([{ artifactId: "art-1", extension: BRAND_VOICE }]) });
+  assert.equal(r.error, undefined, "no error");
+  assert.deepEqual(r.calls, [{ artifactId: "art-1" }]);
 });
 
 test("a pick of nothing gives the empty text and reads nothing", async () => {
-  const extensionTool = await tool();
-  const { calls, lists, ports } = portsWith(TEXT);
-  const out = await extensionTool({ input: { bindings: JSON.stringify(binding([])) }, ports });
-  assert.deepEqual(out, { brandVoiceText: "" });
-  assert.equal(calls.length, 0);
-  assert.equal(lists.length, 0);
+  const r = await outcomeOf({ bindings: JSON.stringify(binding([])) });
+  assert.deepEqual(r.out, { brandVoiceText: "" });
+  assert.equal(r.calls.length, 0);
+  assert.equal(r.lists.length, 0);
 });
 
-/** A first page of the listing that offers a next page: any key of it other
- *  than `artifacts` answers a token for the next page, as the host's page does
- *  under its own key. Each such key a module reads is recorded. */
+/** A first page of the listing that offers a next page, however a module looks
+ *  for one: every key other than `artifacts` reads as a token for the next page
+ *  (as the host's page does under its own key), `in` and an own-property check
+ *  find one, and the page lists a key beside `artifacts`. Each such read, and
+ *  each listing of the page's keys, is recorded. */
 function pageOfferingMore(artifacts) {
   const keysRead = [];
+  const offered = (key) => typeof key === "string" && key !== "artifacts" && key !== "then";
   const page = new Proxy(
     { artifacts },
     {
       get(target, key, receiver) {
-        if (typeof key !== "string" || key === "artifacts" || key === "then") return Reflect.get(target, key, receiver);
-        keysRead.push(key);
+        if (!offered(key)) return Reflect.get(target, key, receiver);
+        keysRead.push(`get ${key}`);
         return "next-page-token";
       },
       has(target, key) {
-        if (typeof key === "string" && key !== "artifacts") keysRead.push(key);
-        return typeof key === "string" || Reflect.has(target, key);
+        if (!offered(key)) return Reflect.has(target, key);
+        keysRead.push(`has ${key}`);
+        return true;
+      },
+      ownKeys(target) {
+        keysRead.push("own keys");
+        return [...Reflect.ownKeys(target), "next"];
+      },
+      getOwnPropertyDescriptor(target, key) {
+        if (!offered(key)) return Reflect.getOwnPropertyDescriptor(target, key);
+        keysRead.push(`own ${key}`);
+        return { value: "next-page-token", writable: true, enumerable: true, configurable: true };
       },
     },
   );
   return { page, keysRead };
 }
 
+test("the first page of the cases below offers its next page to every way of reading a page", () => {
+  const { page, keysRead } = pageOfferingMore([]);
+  assert.equal(page.anyKey, "next-page-token");
+  assert.ok("anyKey" in page);
+  assert.deepEqual(Object.keys(page), ["artifacts", "next"]);
+  assert.ok(Object.hasOwn(page, "anyKey"));
+  assert.equal({ ...page }.next, "next-page-token");
+  assert.deepEqual(
+    keysRead,
+    ["get anyKey", "has anyKey", "own keys", "own next", "own anyKey", "own keys", "own next", "get next"],
+    "each read of the page beside its artifacts, and each listing of its keys, is recorded",
+  );
+});
+
 test("the listing is read once, its first page only, and a brand voice past it is refused at item 501", async () => {
   // 500 newer brand voices fill the first page, and that page offers a next
   // page, which holds the pick: the pick is item 501.
-  const firstPage = Array.from({ length: 500 }, (_, i) => ({ artifactId: `art-newer-${i}`, artifactType: BRAND_VOICE }));
+  const firstPage = Array.from({ length: 500 }, (_, i) => summary(`art-newer-${i}`));
   const offered = pageOfferingMore(firstPage);
   const pages = [offered.page, LISTED];
-  const extensionTool = await tool();
-  const asked = portsWith(TEXT, () => pages.shift());
-  let error;
-  try {
-    await extensionTool({ input: { bindings: binding([REF]) }, ports: asked.ports });
-  } catch (e) {
-    error = e;
-  }
+  const r = await outcomeOf({ bindings: binding([REF]) }, TEXT, () => pages.shift());
   // The paging pin comes first, so a module that asks for the next page fails here.
-  assert.deepEqual(asked.lists, [{ types: [BRAND_VOICE], limit: 500 }], "one request, for the first page only: the next page is never asked for");
-  assert.deepEqual(offered.keysRead, [], "nothing but its artifacts is read from the first page");
-  assert.equal(error?.name, REFUSAL_NAME, "the pick past the first page is refused");
-  seenSentences.add(error.message);
-  assert.equal(error.message, UNREADABLE, "the sentence asks for another brand voice");
-  assert.equal(asked.calls.length, 0, "nothing is read");
+  assert.deepEqual(r.lists, [FIRST_PAGE_REQUEST], "one request, for the first page only: the next page is never asked for");
+  assert.deepEqual(offered.keysRead, [], "nothing but its artifacts is read from the first page, and its keys are never listed");
+  assert.equal(r.name, REFUSAL_NAME, "the pick past the first page is refused");
+  assert.equal(r.message, UNREADABLE, "the sentence asks for another brand voice");
+  assert.equal(r.calls.length, 0, "nothing is read");
   // the same pick as item 500 is on the first page, and is read
-  const item500 = [pageOfferingMore([...firstPage.slice(1), REF_LISTED]).page, { artifacts: [] }];
-  const { calls, lists, ports } = portsWith(TEXT, () => item500.shift());
-  const out = await extensionTool({ input: { bindings: binding([REF]) }, ports });
-  assert.deepEqual(out, { brandVoiceText: "Short, direct sentences." });
-  assert.equal(lists.length, 1);
-  assert.equal(calls.length, 1);
+  const item500 = pageOfferingMore([...firstPage.slice(1), REF_LISTED]);
+  const second = [item500.page, { artifacts: [] }];
+  const read = await outcomeOf({ bindings: binding([REF]) }, TEXT, () => second.shift());
+  assert.deepEqual(read.lists, [FIRST_PAGE_REQUEST], "one request");
+  assert.deepEqual(item500.keysRead, [], "nothing but its artifacts is read from the first page");
+  assert.deepEqual(read.out, { brandVoiceText: "Short, direct sentences." });
+  assert.equal(read.calls.length, 1);
+});
+
+test("a short first page that offers a next page is the only page read, and a pick past it is refused", async () => {
+  // The host may answer fewer than 500 rows and still offer a next page, when
+  // rows the run may not see were filtered out of its scans.
+  const shortPage = pageOfferingMore([summary("art-newer-0"), summary("art-newer-1"), summary("art-newer-2")]);
+  const pages = [shortPage.page, LISTED];
+  const r = await outcomeOf({ bindings: binding([REF]) }, TEXT, () => pages.shift());
+  assert.deepEqual(r.lists, [FIRST_PAGE_REQUEST], "one request: the next page is never asked for");
+  assert.deepEqual(shortPage.keysRead, [], "nothing but its artifacts is read from the page");
+  assert.equal(r.message, UNREADABLE, "the sentence asks for another brand voice");
+  assert.equal(r.calls.length, 0, "nothing is read");
 });
 
 test("an artifact that is not a brand voice stops the run, and its text is never read", async () => {
   const cases = [
-    // a ref that names another artifact type the pack also declares
+    // a ref that names another artifact package the pack also declares
     { refs: [{ ...REF, extension: BLOG_IDEA }], listing: LISTED },
-    // a ref that names no type
+    // a ref that names no package
     { refs: [{ artifactId: "art-1", representationRevisionId: "rev-1" }], listing: LISTED },
-    // the listing holds the id under another type
-    { refs: [REF], listing: { artifacts: [{ artifactId: "art-1", artifactType: BLOG_IDEA }] } },
+    // the listing holds the id under another object type
+    { refs: [REF], listing: { artifacts: [summary("art-1", BLOG_IDEA_TYPE)] } },
+    // the listing holds the id with no object type
+    { refs: [REF], listing: { artifacts: [{ ...REF_LISTED, objectType: undefined }] } },
+    // the brand-voice name in the stored form, not in the object type
+    { refs: [REF], listing: { artifacts: [{ artifactId: "art-1", artifactType: BRAND_VOICE }] } },
+    { refs: [REF], listing: { artifacts: [{ artifactId: "art-1", artifactType: BRAND_VOICE_TYPE }] } },
+    // the package name where the object type belongs
+    { refs: [REF], listing: { artifacts: [summary("art-1", BRAND_VOICE)] } },
   ];
   for (const { refs, listing } of cases) {
     const r = await refusalOf({ bindings: binding(refs) }, TEXT, listing);
-    assert.equal(r.name, REFUSAL_NAME, JSON.stringify(refs));
-    assert.equal(r.message, NOT_A_BRAND_VOICE, JSON.stringify(refs));
+    assert.equal(r.name, REFUSAL_NAME, JSON.stringify(refs) + JSON.stringify(listing));
+    assert.equal(r.message, NOT_A_BRAND_VOICE, JSON.stringify(refs) + JSON.stringify(listing));
     assert.equal(r.calls.length, 0, "nothing is read");
   }
 });
 
 test("a pick the brand-voice listing does not hold stops the run, and its text is never read", async () => {
   const listings = [
-    // a ref that claims the brand-voice type for an artifact the listing does not hold
-    { artifacts: [{ artifactId: "art-2", artifactType: BRAND_VOICE }] },
+    // a ref that claims the brand-voice package for an artifact the listing does not hold
+    { artifacts: [summary("art-2")] },
     // an empty listing
     { artifacts: [] },
     // a listing without a list
@@ -249,7 +349,7 @@ test("a pick the brand-voice listing does not hold stops the run, and its text i
     const r = await refusalOf({ bindings: binding([REF]) }, TEXT, listing);
     assert.equal(r.name, REFUSAL_NAME, JSON.stringify(listing));
     assert.equal(r.message, UNREADABLE, JSON.stringify(listing));
-    assert.equal(r.lists.length, 1);
+    assert.deepEqual(r.lists, [FIRST_PAGE_REQUEST]);
     assert.equal(r.calls.length, 0, "nothing is read");
   }
 });
@@ -275,7 +375,7 @@ test("any other refusal of the content read stops the run, never runs without th
 test("a failure that is not the content read's refusal is thrown on as it is, never as the person's pick", async () => {
   const storeFault = new Error("connection reset");
   const lookalike = Object.assign(new Error("not a content refusal"), { reason: "not-text" });
-  const admission = Object.assign(new Error("artifact type not declared"), { name: "ArtifactAdmissionRefusal" });
+  const admission = admissionRefusal(BRAND_VOICE_TYPE);
   for (const thrown of [storeFault, lookalike, admission, "boom"]) {
     const r = await refusalOf({ bindings: binding([REF]) }, () => {
       throw thrown;
@@ -283,12 +383,13 @@ test("a failure that is not the content read's refusal is thrown on as it is, ne
     assert.equal(r.error, thrown, "the same value is thrown on");
     assert.notEqual(r.name, REFUSAL_NAME);
   }
-  const listFault = new Error("listing failed");
-  const r = await refusalOf({ bindings: binding([REF]) }, TEXT, () => {
-    throw listFault;
-  });
-  assert.equal(r.error, listFault, "a failed listing is thrown on as it is");
-  assert.equal(r.calls.length, 0);
+  for (const listFault of [new Error("listing failed"), admissionRefusal(BRAND_VOICE_TYPE)]) {
+    const r = await refusalOf({ bindings: binding([REF]) }, TEXT, () => {
+      throw listFault;
+    });
+    assert.equal(r.error, listFault, "a failed or refused listing is thrown on as it is");
+    assert.equal(r.calls.length, 0);
+  }
 });
 
 test("a read without text, a cut text or an empty text stops the run", async () => {
