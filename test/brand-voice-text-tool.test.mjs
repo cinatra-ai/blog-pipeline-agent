@@ -166,18 +166,52 @@ test("a pick of nothing gives the empty text and reads nothing", async () => {
   assert.equal(lists.length, 0);
 });
 
+/** A first page of the listing that offers a next page: any key of it other
+ *  than `artifacts` answers a token for the next page, as the host's page does
+ *  under its own key. Each such key a module reads is recorded. */
+function pageOfferingMore(artifacts) {
+  const keysRead = [];
+  const page = new Proxy(
+    { artifacts },
+    {
+      get(target, key, receiver) {
+        if (typeof key !== "string" || key === "artifacts" || key === "then") return Reflect.get(target, key, receiver);
+        keysRead.push(key);
+        return "next-page-token";
+      },
+      has(target, key) {
+        if (typeof key === "string" && key !== "artifacts") keysRead.push(key);
+        return typeof key === "string" || Reflect.has(target, key);
+      },
+    },
+  );
+  return { page, keysRead };
+}
+
 test("the listing is read once, its first page only, and a brand voice past it is refused at item 501", async () => {
-  // 500 newer brand voices fill the first page; the pick would be item 501.
+  // 500 newer brand voices fill the first page, and that page offers a next
+  // page, which holds the pick: the pick is item 501.
   const firstPage = Array.from({ length: 500 }, (_, i) => ({ artifactId: `art-newer-${i}`, artifactType: BRAND_VOICE }));
-  const pages = [{ artifacts: firstPage }, LISTED];
-  const r = await refusalOf({ bindings: binding([REF]) }, TEXT, () => pages.shift());
-  assert.equal(r.name, REFUSAL_NAME);
-  assert.equal(r.message, UNREADABLE, "the sentence asks for another brand voice");
-  assert.deepEqual(r.lists, [{ types: [BRAND_VOICE], limit: 500 }], "one request, for the first page only");
-  assert.equal(r.calls.length, 0, "nothing is read");
-  // the same pick as item 500 is on the page, and is read
+  const offered = pageOfferingMore(firstPage);
+  const pages = [offered.page, LISTED];
   const extensionTool = await tool();
-  const { calls, lists, ports } = portsWith(TEXT, { artifacts: [...firstPage.slice(1), REF_LISTED] });
+  const asked = portsWith(TEXT, () => pages.shift());
+  let error;
+  try {
+    await extensionTool({ input: { bindings: binding([REF]) }, ports: asked.ports });
+  } catch (e) {
+    error = e;
+  }
+  // The paging pin comes first, so a module that asks for the next page fails here.
+  assert.deepEqual(asked.lists, [{ types: [BRAND_VOICE], limit: 500 }], "one request, for the first page only: the next page is never asked for");
+  assert.deepEqual(offered.keysRead, [], "nothing but its artifacts is read from the first page");
+  assert.equal(error?.name, REFUSAL_NAME, "the pick past the first page is refused");
+  seenSentences.add(error.message);
+  assert.equal(error.message, UNREADABLE, "the sentence asks for another brand voice");
+  assert.equal(asked.calls.length, 0, "nothing is read");
+  // the same pick as item 500 is on the first page, and is read
+  const item500 = [pageOfferingMore([...firstPage.slice(1), REF_LISTED]).page, { artifacts: [] }];
+  const { calls, lists, ports } = portsWith(TEXT, () => item500.shift());
   const out = await extensionTool({ input: { bindings: binding([REF]) }, ports });
   assert.deepEqual(out, { brandVoiceText: "Short, direct sentences." });
   assert.equal(lists.length, 1);
