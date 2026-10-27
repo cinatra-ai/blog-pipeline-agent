@@ -384,6 +384,29 @@ test("the descriptions name the pauses in the order the run makes them", () => {
   }
 });
 
+test("an answer to an older run's removed pause cannot start this flow", () => {
+  // The host keeps a parked run's conversation in the mount's memory, so a
+  // changed pack or a restart loses it, and the person's answer to the old
+  // free-text pause then reaches this flow as the start of a new conversation.
+  // The loader keeps only the start inputs the flow declares; the answer names
+  // `brandVoice`, which is not one, and carries no `brief`. Because `brief` is
+  // required with no default, the start is refused and the run ends failed,
+  // before any step runs or anything is written.
+  const start = parts.start;
+  const brief = (start.inputs ?? []).find((i) => i.title === "brief");
+  assert.ok(brief, "the start takes the brief");
+  assert.ok(!("default" in brief), "the brief has no default, so a start without it is refused");
+  assert.equal(
+    (start.inputs ?? []).find((i) => i.title === "brandVoice"),
+    undefined,
+    "no start input takes the old pause's answer",
+  );
+  assert.ok(
+    (oas.inputs ?? []).some((i) => i.title === "brief" && !("default" in i)),
+    "the flow's own inputs keep the brief required",
+  );
+});
+
 test("the brand-voice pick is handed down to the writing step", () => {
   // "One brand-voice pick handed down": the writer's own brand-voice slot is
   // satisfied by the pipeline's pick, and no free text reaches its `voice`.
