@@ -18,7 +18,11 @@
  * registers, lists and admits a package's declared type only under that name)
  * and refuses any other type outright,
  * and each listed row is a summary as the host's listing projects it, whose
- * `objectType` is the type and whose `artifactType` is the stored form.
+ * `objectType` is the type and whose `artifactType` is the stored form. The
+ * content read answers as the host's does: it refuses a read that names a type
+ * the row is not of ("type-mismatch"), and it answers the type of the row it
+ * read. The retype cases change the row's type between the listing and the
+ * read, as a typed promotion can.
  *
  *   node --test test/brand-voice-text-tool.test.mjs
  */
@@ -154,7 +158,19 @@ function portsWith(answer, listing = LISTED) {
   };
 }
 
-const TEXT = { artifactId: "art-1", representationRevisionId: "rev-1", mime: "text/markdown", text: "Short, direct sentences.", truncated: false, bytesRead: 24, totalBytes: 24 };
+const TEXT = { artifactId: "art-1", representationRevisionId: "rev-1", mime: "text/markdown", text: "Short, direct sentences.", truncated: false, bytesRead: 24, totalBytes: 24, objectType: BRAND_VOICE_TYPE };
+
+/** The host's content read over a row whose type is now `rowType`: a read that
+ *  names another type is refused on that row read, and a read that names none
+ *  answers the row's text and its type. */
+function hostReadOfRowTyped(rowType, text) {
+  return (request) => {
+    if (request?.objectType !== undefined && request.objectType !== rowType) {
+      throw contentRefusal("type-mismatch");
+    }
+    return { ...TEXT, text, objectType: rowType };
+  };
+}
 
 /** Every sentence a case below saw the module stop a run with. */
 const seenSentences = new Set();
@@ -207,7 +223,9 @@ test("the one picked brand voice comes back as its text, from the JSON text a pa
   assert.deepEqual(r.lists, [FIRST_PAGE_REQUEST], "the listing is asked first, for the brand-voice object type");
   assert.equal(r.error, undefined, "no error");
   assert.deepEqual(r.out, { brandVoiceText: "Short, direct sentences." });
-  assert.deepEqual(r.calls, [{ artifactId: "art-1", representationRevisionId: "rev-1" }]);
+  assert.deepEqual(r.calls, [
+    { artifactId: "art-1", representationRevisionId: "rev-1", objectType: BRAND_VOICE_TYPE },
+  ]);
 });
 
 test("the list form of the bindings is read the same way", async () => {
@@ -220,7 +238,7 @@ test("the list form of the bindings is read the same way", async () => {
 test("a ref without a revision reads the artifact's latest text", async () => {
   const r = await outcomeOf({ bindings: binding([{ artifactId: "art-1", extension: BRAND_VOICE }]) });
   assert.equal(r.error, undefined, "no error");
-  assert.deepEqual(r.calls, [{ artifactId: "art-1" }]);
+  assert.deepEqual(r.calls, [{ artifactId: "art-1", objectType: BRAND_VOICE_TYPE }]);
 });
 
 test("a pick of nothing gives the empty text and reads nothing", async () => {
@@ -400,6 +418,43 @@ test("a read without text, a cut text or an empty text stops the run", async () 
   assert.equal((await refusalOf({ bindings: binding([REF]) }, { ...TEXT, text: 42 })).message, UNREADABLE);
   assert.equal((await refusalOf({ bindings: binding([REF]) }, { ...TEXT, truncated: true })).message, TOO_LONG);
   assert.equal((await refusalOf({ bindings: binding([REF]) }, { ...TEXT, text: " \n\t" })).message, EMPTY);
+});
+
+test("an artifact retyped between the listing and the read stops the run, and no text comes back", async () => {
+  // The listing holds art-1 as a brand voice; by the read, a typed promotion has
+  // made it another type this pack declares, which the content read admits too.
+  for (const rowType of [BLOG_IDEA_TYPE, "@cinatra-ai/blog-post-artifact:blog-post"]) {
+    const r = await refusalOf({ bindings: binding([REF]) }, hostReadOfRowTyped(rowType, "Not a brand voice."), LISTED);
+    assert.equal(r.name, REFUSAL_NAME, rowType);
+    assert.equal(r.message, NOT_A_BRAND_VOICE, rowType);
+    assert.equal(r.out, undefined, "no text comes back");
+    assert.deepEqual(r.lists, [FIRST_PAGE_REQUEST]);
+    assert.deepEqual(
+      r.calls,
+      [{ artifactId: "art-1", representationRevisionId: "rev-1", objectType: BRAND_VOICE_TYPE }],
+      "the read names the brand-voice type, so the host decides it on the row it reads",
+    );
+  }
+});
+
+test("a read that answers another type stops the run, even when the host did not refuse it", async () => {
+  for (const objectType of [BLOG_IDEA_TYPE, BRAND_VOICE, ""]) {
+    const r = await refusalOf({ bindings: binding([REF]) }, { ...TEXT, objectType });
+    assert.equal(r.name, REFUSAL_NAME, JSON.stringify(objectType));
+    assert.equal(r.message, NOT_A_BRAND_VOICE, JSON.stringify(objectType));
+    assert.equal(r.out, undefined, "no text comes back");
+  }
+});
+
+test("a read that answers no type is a failure of the host, never a brand voice and never the person's pick", async () => {
+  const { objectType: _dropped, ...untyped } = TEXT;
+  for (const answer of [untyped, { ...TEXT, objectType: null }, { ...TEXT, objectType: 7 }]) {
+    const r = await refusalOf({ bindings: binding([REF]) }, answer);
+    assert.equal(r.out, undefined, "no text comes back");
+    assert.notEqual(r.name, REFUSAL_NAME, "thrown on as a failure");
+    assert.ok(r.error instanceof Error);
+    assert.match(r.message, /type/);
+  }
 });
 
 test("more than one picked brand voice is refused before anything is read", async () => {
