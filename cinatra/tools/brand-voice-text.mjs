@@ -23,7 +23,9 @@
  * whether the picked artifact is among them. The host lists and admits by
  * OBJECT TYPE, the full id a package declares in its manifest's `objectTypes`,
  * never by package name: the brand-voice package declares the one type
- * `@cinatra-ai/brand-voice:guide`, and each row of the listing carries its type
+ * `@cinatra-ai/brand-voice-artifact:guide`, under its own package name, the only
+ * namespace under which the host registers a package's declared type as an
+ * artifact type it lists; each row of the listing carries its type
  * as `objectType` (its `artifactType` is the stored form, such as "file"). A ref
  * that names another package, or an artifact the listing holds under another
  * object type or under none, stops the run as not a brand voice. An artifact the
@@ -69,8 +71,9 @@ const SLOT_ID = "brandVoice";
 const BRAND_VOICE_PACKAGE = "@cinatra-ai/brand-voice-artifact";
 
 /** The one object type a brand voice is: the type the brand-voice package
- *  declares, which the host lists and admits by. */
-const BRAND_VOICE_TYPE = "@cinatra-ai/brand-voice:guide";
+ *  declares under its own package name, which the host registers, lists and
+ *  admits by. */
+const BRAND_VOICE_TYPE = "@cinatra-ai/brand-voice-artifact:guide";
 
 /** The one page of the listing the module reads: up to 500 brand voices, the
  *  host's page ceiling. A pick not on it is refused (see KNOWN LIMIT above). */
