@@ -6,11 +6,11 @@ Turns one blog idea your organisation already holds into a finished post with it
 
 **Configuration:** pass a `brief` (required) plus optional `audience`, `tone` (default: informative), `length` (default: medium), `referenceContent` and `ideaCount` (default: 5). `companyUrl`, `blogPostUrl`, `projectId` and `cinatra_run_id` are set by the platform and are not shown.
 
-**API contract:** inputs — `brief` (required), `audience`, `tone`, `length`, `referenceContent`, `ideaCount`, `companyUrl`, `blogPostUrl`, `projectId`, `cinatra_run_id`; outputs — `linkedinPost`, `linkedinTitle`, `brandVoiceContextSlotBindings` (the brand voice used). The post is written during the run as an artifact of its own, not a run output.
+**API contract:** inputs — `brief` (required), `audience`, `tone`, `length`, `referenceContent`, `ideaCount`, `companyUrl`, `blogPostUrl`, `projectId`, `cinatra_run_id`; outputs — `linkedinPost`, `linkedinTitle`. The post is written during the run as an artifact of its own, not a run output.
 
 **Development:** run `node extension-kind-gate.mjs`, `node renderer-binding-gate.mjs` and `npm test` before publishing.
 
-**Review:** the run pauses four times — to pick one stored brand voice (none is preselected), to pick an idea, to review what the run made, and to approve the LinkedIn post. The middle pause names the revisions the run minted, so the review opens on exactly those, one per thing, and the run waits until the last is decided. This flow owns the pause, not the decision.
+**Review:** the run pauses four times — to pick one stored brand voice (none is preselected; a PDF one stops the run), to pick an idea, to review what the run made, and to approve the LinkedIn post. The middle pause names the revisions the run minted, so the review opens on exactly those, one per thing, and the run waits until the last is decided. This flow owns the pause, not the decision.
 
 **Troubleshooting:** a run stopping at the idea step with a sentence instead of a list has no idea left to draft — every stored idea has a draft or is reserved; generate new ideas and start again. A run sitting at the review is waiting: decide the review card, then continue.
 
