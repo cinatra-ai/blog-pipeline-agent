@@ -14,7 +14,9 @@
  * blog-draft-writer-agent, blog-image-generator-agent and blog-pipeline-agent.
  *
  * The ports answer in the host's own shapes: the listing admits only the object
- * type the brand-voice package declares and refuses any other type outright,
+ * type the brand-voice package declares under its own package name (the host
+ * registers, lists and admits a package's declared type only under that name)
+ * and refuses any other type outright,
  * and each listed row is a summary as the host's listing projects it, whose
  * `objectType` is the type and whose `artifactType` is the stored form.
  *
@@ -33,9 +35,10 @@ const TOOL_NAME = "brand_voice_text";
 const MODULE_PATH = "./cinatra/tools/brand-voice-text.mjs";
 /** The brand-voice PACKAGE: the dependency edge, and the `extension` of a ref. */
 const BRAND_VOICE = "@cinatra-ai/brand-voice-artifact";
-/** The OBJECT TYPE that package declares (its manifest's `objectTypes`): the
- *  one type the host lists and admits a brand voice by. */
-const BRAND_VOICE_TYPE = "@cinatra-ai/brand-voice:guide";
+/** The OBJECT TYPE that package declares (its manifest's `objectTypes`), under
+ *  its own package name: the one type the host registers, lists and admits a
+ *  brand voice by. */
+const BRAND_VOICE_TYPE = "@cinatra-ai/brand-voice-artifact:guide";
 const BLOG_IDEA = "@cinatra-ai/blog-idea-artifact";
 const BLOG_IDEA_TYPE = "@cinatra-ai/blog-idea-artifact:blog-idea";
 const REFUSAL_NAME = "ExtensionToolCallRefusal";
