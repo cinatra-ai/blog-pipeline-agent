@@ -20,17 +20,25 @@
  * this pack declares (a blog idea or a blog post too), so it cannot tell a brand
  * voice from them. Before the read, the module asks the host's own listing of
  * brand-voice artifacts (`ports.artifacts.list`, narrowed to that one type)
- * whether the picked artifact is among them. A ref that names another type, or
- * an artifact the listing holds under another type, stops the run as not a
- * brand voice. An artifact the listing does not hold stops the run as a brand
- * voice that cannot be read. Its text is never read.
+ * whether the picked artifact is among them. The host lists and admits by
+ * OBJECT TYPE, the full id a package declares in its manifest's `objectTypes`,
+ * never by package name: the brand-voice package declares the one type
+ * `@cinatra-ai/brand-voice:guide`, and each row of the listing carries its type
+ * as `objectType` (its `artifactType` is the stored form, such as "file"). A ref
+ * that names another package, or an artifact the listing holds under another
+ * object type or under none, stops the run as not a brand voice. An artifact the
+ * listing does not hold stops the run as a brand voice that cannot be read. Its
+ * text is never read.
  *
  * KNOWN LIMIT: ONE PAGE OF THE LISTING. The module reads the first page of the
- * listing only (500 brand voices, the host's page ceiling, newest first) and
- * does not ask for the next page. A brand voice that is not on that first page,
- * the 501st and older of an organization with more, is refused with the
- * sentence that asks for another brand voice, and nothing is read. The run
- * stops; it never runs on an artifact the listing did not show.
+ * listing only (up to 500 brand voices, the host's page ceiling, newest first)
+ * and does not ask for the next page. The first page can hold fewer than 500
+ * and still offer a next page: the host returns a short page when rows the run
+ * may not see were filtered out of its scans. A brand voice that is not on that
+ * first page (the 501st and older of an organization with more, or one past a
+ * short first page) is refused with the sentence that asks for another brand
+ * voice, and nothing is read. The run stops; it never runs on an artifact the
+ * listing did not show.
  *
  * A PDF CANNOT BE PICKED AWAY. A brand-voice artifact may be stored as a PDF,
  * and a context slot cannot limit the forms a person picks from. The content
@@ -57,11 +65,15 @@
 /** The slot whose pick this module reads. */
 const SLOT_ID = "brandVoice";
 
-/** The one artifact type a brand voice is. */
-const BRAND_VOICE_TYPE = "@cinatra-ai/brand-voice-artifact";
+/** The package a brand voice comes from: the `extension` of a picked ref. */
+const BRAND_VOICE_PACKAGE = "@cinatra-ai/brand-voice-artifact";
 
-/** The one page of the listing the module reads: 500 brand voices, the host's
- *  page ceiling. A pick not on it is refused (see KNOWN LIMIT above). */
+/** The one object type a brand voice is: the type the brand-voice package
+ *  declares, which the host lists and admits by. */
+const BRAND_VOICE_TYPE = "@cinatra-ai/brand-voice:guide";
+
+/** The one page of the listing the module reads: up to 500 brand voices, the
+ *  host's page ceiling. A pick not on it is refused (see KNOWN LIMIT above). */
 const LISTING_PAGE_LIMIT = 500;
 
 /** The sentences a person reads. Each is one line, with no path and no id, so
@@ -140,7 +152,7 @@ function brandVoiceRefs(bindings) {
 }
 
 /** The one picked ref, checked for the fields the read needs. A ref that names
- *  another artifact type is not a brand voice. */
+ *  another artifact package is not a brand voice. */
 function pickedRef(refs) {
   if (refs.length > 1) throw new BrandVoiceRefusal(MORE_THAN_ONE_REASON);
   const ref = refs[0];
@@ -150,13 +162,14 @@ function pickedRef(refs) {
   if ("representationRevisionId" in ref && !isNonBlankString(ref.representationRevisionId)) {
     throw new BrandVoiceRefusal(NO_BINDING_REASON);
   }
-  if (ref.extension !== BRAND_VOICE_TYPE) throw new BrandVoiceRefusal(NOT_A_BRAND_VOICE_REASON);
+  if (ref.extension !== BRAND_VOICE_PACKAGE) throw new BrandVoiceRefusal(NOT_A_BRAND_VOICE_REASON);
   return ref;
 }
 
 /** Checks the pick against the first page of the host's brand-voice listing,
- *  and refuses it unless the page holds it as a brand voice. A failed listing is
- *  thrown on as it is. */
+ *  and refuses it unless the page holds it under the brand-voice object type.
+ *  Only the page's `artifacts` is read from the page. A failed or refused
+ *  listing is thrown on as it is. */
 async function checkListedBrandVoice(ports, artifactId) {
   const page = await ports.artifacts.list({
     types: [BRAND_VOICE_TYPE],
@@ -164,11 +177,9 @@ async function checkListedBrandVoice(ports, artifactId) {
   });
   const artifacts = isPlainObject(page) && Array.isArray(page.artifacts) ? page.artifacts : [];
   const listed = artifacts.find((a) => isPlainObject(a) && a.artifactId === artifactId);
-  // Not on the first page: another type, or a brand voice past the 500th.
+  // Not on the first page: another type, or a brand voice past that page.
   if (listed === undefined) throw new BrandVoiceRefusal(UNREADABLE_REASON);
-  if (listed.artifactType !== undefined && listed.artifactType !== BRAND_VOICE_TYPE) {
-    throw new BrandVoiceRefusal(NOT_A_BRAND_VOICE_REASON);
-  }
+  if (listed.objectType !== BRAND_VOICE_TYPE) throw new BrandVoiceRefusal(NOT_A_BRAND_VOICE_REASON);
 }
 
 /**
