@@ -120,6 +120,13 @@ test("#3035 brand-voice pick: the pick satisfies the brand-voice slot of every e
       (c?.inputs ?? []).some((i) => i.title === `${child.slotId}ContextSlotBindings`),
     );
     assert.ok(takes, `no step of ${pkg} takes ${child.slotId}ContextSlotBindings`);
+    // The host hands the pick down on a start-node input typed string
+    // (`_ensure_input` in the loader), and the typed graph refuses an edge from a
+    // string into an array: every step of the child that takes it takes text.
+    const types = Object.values(def.$referenced_components).flatMap((c) =>
+      (c?.inputs ?? []).filter((i) => i.title === `${child.slotId}ContextSlotBindings`).map((i) => i.type),
+    );
+    assert.deepEqual([...new Set(types)], ["string"], `${pkg} takes ${child.slotId}ContextSlotBindings as ${types}`);
   }
   for (const line of lines()) {
     assert.ok(
