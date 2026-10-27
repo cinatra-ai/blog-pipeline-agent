@@ -84,7 +84,7 @@ test("every produces entry is typed", () => {
   }
 });
 
-test("the four artifact dependency edges are declared", () => {
+test("the five artifact dependency edges are declared (the brand voice is read as text)", () => {
   const names = (manifest.cinatra.dependencies || [])
     .filter((d) => d.kind === "artifact")
     .map((d) => d.packageName)
@@ -92,6 +92,7 @@ test("the four artifact dependency edges are declared", () => {
   assert.deepEqual(names, [
     "@cinatra-ai/blog-idea-artifact",
     "@cinatra-ai/blog-post-artifact",
+    "@cinatra-ai/brand-voice-artifact",
     "@cinatra-ai/image-artifact",
     "@cinatra-ai/linkedin-artifacts",
   ]);

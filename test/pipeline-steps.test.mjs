@@ -1,8 +1,8 @@
 // THE PIPELINE'S STEPS — plan (C) section 6.1, the walk a person makes.
 //
 // Every case below pins one sentence of that walk onto the flow definition, in
-// the order the walk happens: the stored ideas offered as a real list, the pick
-// that is its own reservation, the brand voice the post is written in, the draft
+// the order the walk happens: the brand voice the post is written in, the stored
+// ideas offered as a real list, the pick that is its own reservation, the draft
 // written while the run is still going,
 // the picture made before anyone reviews anything, the review opened on what the
 // run made, the LinkedIn post at the end, and the pauses the pipeline really has.
@@ -360,7 +360,28 @@ test("the run parks for the brand-voice pick before any draft is written", () =>
   assert.ok(slot, "the flow declares the brand-voice pause");
   assert.equal(slot.selectionMode, "interactive", "a person picks; nothing is picked for them");
   assert.equal(parts.brand_voice_gate, undefined, "the free-text pause is gone");
-  assert.ok(at("start") < at("draft_flow") && at("start") < at("write_draft"));
+  // The host puts the list step in front of the start's own successor, and that
+  // successor is the step that takes the pick and reads its text: the brand
+  // voice comes first, then the stored ideas, then everything else.
+  const after = (id) =>
+    oas.control_flow_connections.filter((e) => e.from_node.$component_ref === id).map((e) => e.to_node.$component_ref);
+  assert.deepEqual(after("start"), ["read_brand_voice"], "the read of the pick is the start's only successor");
+  assert.deepEqual(after("read_brand_voice"), ["prepare_ideas"], "the stored ideas come after the brand voice");
+  assert.ok(
+    (parts.read_brand_voice.inputs ?? []).some((i) => i.title === "brandVoiceContextSlotBindings"),
+    "the start's successor is the step that takes the pick",
+  );
+  assert.ok(at("read_brand_voice") < at("prepare_ideas") && at("prepare_ideas") < at("draft_flow"));
+  assert.ok(at("draft_flow") < at("write_draft"));
+});
+
+test("the descriptions name the pauses in the order the run makes them", () => {
+  for (const [where, text] of [["the flow", oas.description], ["the manifest", manifest.description]]) {
+    const voice = text.indexOf("brand-voice pick");
+    const ideas = text.indexOf("stored-ideas gate");
+    assert.ok(voice !== -1 && ideas !== -1, `${where} names both pauses`);
+    assert.ok(voice < ideas, `${where} names the brand-voice pick before the stored-ideas gate`);
+  }
 });
 
 test("the brand-voice pick is handed down to the writing step", () => {

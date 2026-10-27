@@ -122,11 +122,29 @@ test("#3035 brand-voice pick: the pick satisfies the brand-voice slot of every e
     assert.ok(takes, `no step of ${pkg} takes ${child.slotId}ContextSlotBindings`);
     // The host hands the pick down on a start-node input typed string
     // (`_ensure_input` in the loader), and the typed graph refuses an edge from a
-    // string into an array: every step of the child that takes it takes text.
-    const types = Object.values(def.$referenced_components).flatMap((c) =>
-      (c?.inputs ?? []).filter((i) => i.title === `${child.slotId}ContextSlotBindings`).map((i) => i.type),
+    // string into an array. The pick names a stored artifact and carries none of
+    // its text, so the one step of the child that takes it is the child's read
+    // step: it takes the pick as text and reads the brand voice's text through
+    // the tool `brand_voice_text`, which this pack declares too, because the host
+    // resolves a tool against the pack whose run calls it.
+    const short = pkg.split("/")[1];
+    const takers = Object.entries(def.$referenced_components)
+      .filter(([, c]) => (c?.inputs ?? []).some((i) => i.title === `${child.slotId}ContextSlotBindings`))
+      .map(([id]) => id);
+    assert.deepEqual(takers, [`${short}__read_brand_voice`], `${pkg}: only its read step takes the pick`);
+    const read = def.$referenced_components[`${short}__read_brand_voice`];
+    assert.deepEqual(
+      read.inputs.filter((i) => i.title === `${child.slotId}ContextSlotBindings`).map((i) => i.type),
+      ["string"],
+      `${pkg} takes ${child.slotId}ContextSlotBindings as text`,
     );
-    assert.deepEqual([...new Set(types)], ["string"], `${pkg} takes ${child.slotId}ContextSlotBindings as ${types}`);
+    assert.equal(read.data.tool, "extension_tool");
+    assert.equal(read.data.input.name, "brand_voice_text");
+    // The child's work step writes from the text the read step gives.
+    const textEdges = def.data_flow_connections.filter(
+      (e) => e.source_node.$component_ref === `${short}__read_brand_voice` && e.source_output === "brandVoiceText",
+    );
+    assert.equal(textEdges.length, 1, `${pkg}: the brand voice's text reaches one step`);
   }
   for (const line of lines()) {
     assert.ok(
@@ -147,8 +165,9 @@ test("#3035 brand-voice pick: the draft step no longer receives a voice string f
 
 test("#3035 brand-voice pick: the pipeline's own graph takes its pick, so the host mounts the slot", () => {
   // The loader refuses a declared slot that no step of the flow's own graph
-  // takes. This flow's end node takes the pick and reports it as a run output:
-  // the brand voice the run was written in. It binds no artifact.
+  // takes. This flow's own read step takes the pick, right after the start, and
+  // reads its text through the declared tool, so a brand voice that cannot be
+  // read (a PDF) stops the run before any idea is taken or any draft is written.
   const own = new Set(oas.nodes.map((n) => n.$component_ref));
   const consumers = Object.entries(refs).filter(
     ([id, c]) =>
@@ -156,17 +175,26 @@ test("#3035 brand-voice pick: the pipeline's own graph takes its pick, so the ho
       c?.component_type !== "Flow" &&
       (c?.inputs ?? []).some((i) => i.title === "contextSlotBindings" || i.title === "brandVoiceContextSlotBindings"),
   );
-  assert.deepEqual(consumers.map(([id]) => id), ["end"]);
-  const taken = refs.end.inputs.filter((i) => i.title === "brandVoiceContextSlotBindings");
-  assert.equal(taken.length, 1, "the end node takes the pick by its qualified name");
-  assert.ok(!refs.end.inputs.some((i) => i.title === "contextSlotBindings"), "no bare input");
-  const reported = oas.outputs.filter((o) => o.title === "brandVoiceContextSlotBindings");
-  assert.equal(reported.length, 1, "the run reports the brand voice it was written in");
-  assert.equal(reported[0].type, "array");
-  assert.ok(!reported[0].cinatra?.artifact, "the report binds no artifact");
-  assert.deepEqual(
-    oas.outputs.map((o) => o.title).sort(),
-    ["brandVoiceContextSlotBindings", "linkedinPost", "linkedinTitle"],
-    "the run's other outputs stay as they were",
+  assert.deepEqual(consumers.map(([id]) => id), ["read_brand_voice"]);
+  const read = refs.read_brand_voice;
+  const input = read.inputs.find((i) => i.title === "brandVoiceContextSlotBindings");
+  assert.equal(input.type, "array", "in its own graph the flow takes the pick as the list itself");
+  assert.equal(read.data.tool, "extension_tool");
+  assert.equal(read.data.input.name, "brand_voice_text");
+  assert.equal(
+    read.data.input.input.bindings,
+    "{# pyagentspec-input-hint (do not remove): {{ brandVoiceContextSlotBindings }} #}{{ brandVoiceContextSlotBindings | tojson }}",
+  );
+  assert.equal(read.data.agent_run_id, "{{ cinatra_run_id }}");
+});
+
+test("#3035 brand-voice pick: the run reports no binding of the pick", () => {
+  // The binding names stored artifacts, revisions and scopes: backend detail a
+  // person has no use for. No output of the run carries it.
+  assert.deepEqual(oas.outputs.map((o) => o.title).sort(), ["linkedinPost", "linkedinTitle"]);
+  assert.deepEqual(refs.end.outputs.map((o) => o.title).sort(), ["linkedinPost", "linkedinTitle"]);
+  assert.ok(
+    !(refs.end.inputs ?? []).some((i) => /ContextSlotBindings$|^contextSlotBindings$/.test(i.title)),
+    "the end node takes no binding",
   );
 });
