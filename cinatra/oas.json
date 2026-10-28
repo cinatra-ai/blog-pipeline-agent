@@ -3,13 +3,14 @@
   "component_type": "Flow",
   "id": "blog-pipeline-agent-flow",
   "name": "Blog Pipeline Agent",
-  "description": "Parent orchestrator (WayFlow Flow OAS) that turns one stored blog idea into a reviewed blog post, its featured image and the LinkedIn post that announces it. Manual brief and reference material only; transcript input is not accepted. Four pauses of its own: the stored-ideas gate, the brand-voice pick the draft is written in, the review the run parks at, and the LinkedIn post.",
+  "description": "Parent orchestrator (WayFlow Flow OAS) that turns one stored blog idea into a reviewed blog post, its featured image and the LinkedIn post that announces it. Manual brief and reference material only; transcript input is not accepted. Four pauses of its own: the brand-voice pick the draft and its picture are made in, then the stored-ideas gate, the review the run parks at, and the LinkedIn post.",
   "metadata": {
     "cinatra": {
       "type": "flow",
       "packageName": "@cinatra-ai/blog-pipeline-agent",
       "hitlScreens": [
-        "@cinatra-ai/blog-pipeline-agent:idea-selection"
+        "@cinatra-ai/blog-pipeline-agent:idea-selection",
+        "@cinatra-ai/context-selection-agent:context-selector"
       ],
       "produces": [
         {
@@ -23,6 +24,30 @@
         {
           "extension": "@cinatra-ai/linkedin-artifacts",
           "objectTypeId": "@cinatra-ai/linkedin:post-draft"
+        }
+      ],
+      "contextSlots": [
+        {
+          "slotId": "brandVoice",
+          "acceptedArtifactExtensions": [
+            "@cinatra-ai/brand-voice-artifact"
+          ],
+          "selectionMode": "interactive",
+          "resolutionMode": "override",
+          "minItems": 1,
+          "maxItems": 1
+        }
+      ],
+      "parentSatisfiedContextSlots": [
+        {
+          "parentSlotId": "brandVoice",
+          "childPackage": "@cinatra-ai/blog-draft-writer-agent",
+          "childSlotId": "brandVoice"
+        },
+        {
+          "parentSlotId": "brandVoice",
+          "childPackage": "@cinatra-ai/blog-image-generator-agent",
+          "childSlotId": "brandVoice"
         }
       ]
     }
@@ -99,6 +124,9 @@
       "$component_ref": "start"
     },
     {
+      "$component_ref": "read_brand_voice"
+    },
+    {
       "$component_ref": "prepare_ideas"
     },
     {
@@ -109,9 +137,6 @@
     },
     {
       "$component_ref": "reserve_idea"
-    },
-    {
-      "$component_ref": "brand_voice_gate"
     },
     {
       "$component_ref": "draft_flow"
@@ -153,12 +178,26 @@
   "control_flow_connections": [
     {
       "component_type": "ControlFlowEdge",
-      "id": "start->prepare_ideas",
-      "name": "start->prepare_ideas",
+      "id": "start->read_brand_voice",
+      "name": "start->read_brand_voice",
       "description": "",
       "metadata": {},
       "from_node": {
         "$component_ref": "start"
+      },
+      "from_branch": null,
+      "to_node": {
+        "$component_ref": "read_brand_voice"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "read_brand_voice->prepare_ideas",
+      "name": "read_brand_voice->prepare_ideas",
+      "description": "",
+      "metadata": {},
+      "from_node": {
+        "$component_ref": "read_brand_voice"
       },
       "from_branch": null,
       "to_node": {
@@ -209,26 +248,12 @@
     },
     {
       "component_type": "ControlFlowEdge",
-      "id": "reserve_idea->brand_voice_gate",
-      "name": "reserve_idea->brand_voice_gate",
+      "id": "reserve_idea->draft_flow",
+      "name": "reserve_idea->draft_flow",
       "description": "",
       "metadata": {},
       "from_node": {
         "$component_ref": "reserve_idea"
-      },
-      "from_branch": null,
-      "to_node": {
-        "$component_ref": "brand_voice_gate"
-      }
-    },
-    {
-      "component_type": "ControlFlowEdge",
-      "id": "brand_voice_gate->draft_flow",
-      "name": "brand_voice_gate->draft_flow",
-      "description": "",
-      "metadata": {},
-      "from_node": {
-        "$component_ref": "brand_voice_gate"
       },
       "from_branch": null,
       "to_node": {
@@ -393,6 +418,21 @@
   "data_flow_connections": [
     {
       "component_type": "DataFlowEdge",
+      "id": "cinatra_run_id:start->read_brand_voice.cinatra_run_id",
+      "name": "cinatra_run_id:start->read_brand_voice",
+      "description": "",
+      "metadata": {},
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "cinatra_run_id",
+      "destination_node": {
+        "$component_ref": "read_brand_voice"
+      },
+      "destination_input": "cinatra_run_id"
+    },
+    {
+      "component_type": "DataFlowEdge",
       "id": "cinatra_run_id:start->prepare_ideas.cinatra_run_id",
       "name": "cinatra_run_id:start->prepare_ideas",
       "description": "",
@@ -540,21 +580,6 @@
         "$component_ref": "draft_flow"
       },
       "destination_input": "idea"
-    },
-    {
-      "component_type": "DataFlowEdge",
-      "id": "brandVoice:brand_voice_gate->draft_flow.voice",
-      "name": "brandVoice:brand_voice_gate->draft_flow",
-      "description": "",
-      "metadata": {},
-      "source_node": {
-        "$component_ref": "brand_voice_gate"
-      },
-      "source_output": "brandVoice",
-      "destination_node": {
-        "$component_ref": "draft_flow"
-      },
-      "destination_input": "voice"
     },
     {
       "component_type": "DataFlowEdge",
@@ -1279,6 +1304,53 @@
         }
       ]
     },
+    "read_brand_voice": {
+      "component_type": "ApiNode",
+      "id": "read_brand_voice",
+      "name": "Read the picked brand voice as text",
+      "url": "{{CINATRA_BASE_URL}}/api/agents/passthrough",
+      "http_method": "POST",
+      "data": {
+        "tool": "extension_tool",
+        "input": {
+          "name": "brand_voice_text",
+          "input": {
+            "bindings": "{# pyagentspec-input-hint (do not remove): {{ brandVoiceContextSlotBindings }} #}{{ brandVoiceContextSlotBindings | tojson }}"
+          }
+        },
+        "agent_run_id": "{{ cinatra_run_id }}"
+      },
+      "inputs": [
+        {
+          "title": "brandVoiceContextSlotBindings",
+          "type": "array",
+          "json_schema": {
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        {
+          "title": "cinatra_run_id",
+          "type": "string",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "brandVoiceText",
+          "type": "string"
+        }
+      ],
+      "metadata": {
+        "cinatra": {
+          "riskClass": "read_only",
+          "requiresApproval": false,
+          "packageName": "@cinatra-ai/blog-pipeline-agent",
+          "description": "The consumer of the run's one brand-voice pick, right after the list step the host draws for it: it reads the picked brand voice's text through the tool this pack declares, so a brand voice that cannot be read as text (a PDF) stops the run with one sentence before an idea is taken or a draft is written. The writer and the image generator read the same pick themselves."
+        }
+      }
+    },
     "prepare_ideas": {
       "component_type": "ApiNode",
       "id": "prepare_ideas",
@@ -1487,37 +1559,6 @@
         }
       }
     },
-    "brand_voice_gate": {
-      "component_type": "InputMessageNode",
-      "id": "brand_voice_gate",
-      "name": "Pick the brand voice",
-      "metadata": {
-        "cinatra": {
-          "riskClass": "read_only",
-          "requiresApproval": true,
-          "a2uiSurfaceId": "blog-pipeline:brand-voice",
-          "inputMessageSchema": {
-            "type": "object",
-            "properties": {
-              "brandVoice": {
-                "type": "string",
-                "title": "Brand voice",
-                "description": "The brand-voice material this post is written in: the voice instructions, or example sentences to mirror. Leave it empty to write in the pipeline's default voice.",
-                "x-multiline": true
-              }
-            }
-          },
-          "description": "The brand-voice pause of plan (C) section 6: one pause for the brand voice, before the draft is written. A person picks the brand-voice material the post is written in \u2014 the voice instructions, or the example sentences the writer mirrors \u2014 and that ONE pick is handed down to the writing step, which takes it as its `voice` input. The pick is not a required field: a person with no brand-voice material to give can continue, and the writer drafts in its default voice exactly as it did before this pause existed. This flow owns the pause; nothing is picked for the person."
-        }
-      },
-      "outputs": [
-        {
-          "title": "brandVoice",
-          "type": "string",
-          "default": ""
-        }
-      ]
-    },
     "draft_flow": {
       "component_type": "FlowNode",
       "id": "draft_flow",
@@ -1537,6 +1578,34 @@
       "component_type": "Flow",
       "id": "blog-draft-writer-agent-subflow",
       "name": "Blog Draft Writer Agent",
+      "metadata": {
+        "cinatra": {
+          "type": "flow",
+          "packageName": "@cinatra-ai/blog-draft-writer-agent",
+          "contextSlots": [
+            {
+              "slotId": "draftContext",
+              "acceptedArtifactExtensions": [
+                "@cinatra-ai/blog-idea-artifact"
+              ],
+              "selectionMode": "interactive",
+              "resolutionMode": "accumulate",
+              "minItems": 0,
+              "maxItems": 5
+            },
+            {
+              "slotId": "brandVoice",
+              "acceptedArtifactExtensions": [
+                "@cinatra-ai/brand-voice-artifact"
+              ],
+              "selectionMode": "interactive",
+              "resolutionMode": "override",
+              "minItems": 0,
+              "maxItems": 1
+            }
+          ]
+        }
+      },
       "inputs": [
         {
           "title": "idea",
@@ -1640,6 +1709,9 @@
           "$component_ref": "blog-draft-writer-agent__context_draftContext"
         },
         {
+          "$component_ref": "blog-draft-writer-agent__read_brand_voice"
+        },
+        {
           "$component_ref": "blog-draft-writer-agent__write"
         },
         {
@@ -1669,9 +1741,19 @@
         },
         {
           "component_type": "ControlFlowEdge",
-          "name": "blog-draft-writer-agent__context_draftContext_to_write",
+          "name": "blog-draft-writer-agent__context_draftContext_to_read_brand_voice",
           "from_node": {
             "$component_ref": "blog-draft-writer-agent__context_draftContext"
+          },
+          "to_node": {
+            "$component_ref": "blog-draft-writer-agent__read_brand_voice"
+          }
+        },
+        {
+          "component_type": "ControlFlowEdge",
+          "name": "blog-draft-writer-agent__read_brand_voice_to_write",
+          "from_node": {
+            "$component_ref": "blog-draft-writer-agent__read_brand_voice"
           },
           "to_node": {
             "$component_ref": "blog-draft-writer-agent__write"
@@ -1893,7 +1975,31 @@
           "destination_node": {
             "$component_ref": "blog-draft-writer-agent__write"
           },
-          "destination_input": "contextSlotBindings"
+          "destination_input": "draftContextContextSlotBindings"
+        },
+        {
+          "component_type": "DataFlowEdge",
+          "name": "blog-draft-writer-agent__start_cinatra_run_id_to_read_brand_voice_cinatra_run_id",
+          "source_node": {
+            "$component_ref": "blog-draft-writer-agent__start"
+          },
+          "source_output": "cinatra_run_id",
+          "destination_node": {
+            "$component_ref": "blog-draft-writer-agent__read_brand_voice"
+          },
+          "destination_input": "cinatra_run_id"
+        },
+        {
+          "component_type": "DataFlowEdge",
+          "name": "blog-draft-writer-agent__read_brand_voice_brandVoiceText_to_write_brandVoiceText",
+          "source_node": {
+            "$component_ref": "blog-draft-writer-agent__read_brand_voice"
+          },
+          "source_output": "brandVoiceText",
+          "destination_node": {
+            "$component_ref": "blog-draft-writer-agent__write"
+          },
+          "destination_input": "brandVoiceText"
         }
       ],
       "$referenced_components": {
@@ -1986,6 +2092,48 @@
             }
           ]
         },
+        "blog-draft-writer-agent__read_brand_voice": {
+          "component_type": "ApiNode",
+          "id": "blog-draft-writer-agent__read_brand_voice",
+          "name": "Read the picked brand voice as text",
+          "url": "{{CINATRA_BASE_URL}}/api/agents/passthrough",
+          "http_method": "POST",
+          "data": {
+            "tool": "extension_tool",
+            "input": {
+              "name": "brand_voice_text",
+              "input": {
+                "bindings": "{{ brandVoiceContextSlotBindings }}"
+              }
+            },
+            "agent_run_id": "{{ cinatra_run_id }}"
+          },
+          "inputs": [
+            {
+              "title": "brandVoiceContextSlotBindings",
+              "type": "string"
+            },
+            {
+              "title": "cinatra_run_id",
+              "type": "string",
+              "default": ""
+            }
+          ],
+          "outputs": [
+            {
+              "title": "brandVoiceText",
+              "type": "string"
+            }
+          ],
+          "metadata": {
+            "cinatra": {
+              "riskClass": "read_only",
+              "requiresApproval": false,
+              "packageName": "@cinatra-ai/blog-draft-writer-agent",
+              "description": "Reads the text of the ONE stored brand-voice artifact picked for this run through the tool this pack declares, so the next step writes in it. A pick of nothing gives the empty text; a brand voice that cannot be read as text (a PDF) stops the run with one sentence."
+            }
+          }
+        },
         "blog-draft-writer-agent__write": {
           "component_type": "ApiNode",
           "id": "blog-draft-writer-agent__write",
@@ -1995,8 +2143,8 @@
           "data": {
             "agent_id": "blog-draft-writer-agent",
             "toolbox_ids": [],
-            "system": "You are a stateless blog draft writer agent. No toolbox joins this turn: Do NOT call any MCP tool. Follow the instructions below step-by-step. You fill five declared output fields \u2014 `title`, `excerpt`, `content`, `sourcesUsed`, `notes`. The runtime supplies and enforces the object that carries them, so never describe, quote, or serialise that object into any field: put ONLY each field's own value in it.\n\n# Blog Draft Writer Agent\n\nYou are a stateless blog-draft-writer agent. Take the inputs (`idea`, `tone`, `length`, `referenceContent`, `audience`, `voice`, `sources`), run the 5 steps below, and fill the five declared output fields. Never throw.\n\n## Inputs\n\n- `idea: string` (required): the whole idea, as ONE piece of plain text. There are no sub-fields and there is no JSON. An idea from `@cinatra-ai/blog-idea-generator-agent` opens with a `Title: ` line carrying its title, then a 1-3 sentence summary, then an `Outline:` line followed by 3-7 points, one per line. A person may instead type the idea freehand, as one sentence with no marker at all. Read whatever arrives; never expect fields.\n- `tone: string` (default `\"informative\"`) \u2014 `informative` / `casual` / `technical` / `executive` / or a free-form descriptor.\n- `length: string` (default `\"medium\"`) \u2014 `short` \u2248 400 words / `medium` \u2248 800 / `long` \u2248 1500 / or a free-form `\"<N> words\"` pattern (e.g., `\"1200 words\"`).\n- `referenceContent: string` (default `\"\"`) \u2014 transcript, research notes, or archive article body to draw from. Treat as **background source material only**: extract relevant thoughts and restate them generically. **Do not mention** the original transcript, its speakers, or outside companies/people. Do not reuse names of persons or companies from `referenceContent`.\n- `audience: string` (default `\"\"`) \u2014 target reader (e.g., `\"B2B SaaS founders evaluating enterprise sales\"`).\n- `voice: string` (default `\"\"`) \u2014 brand voice instructions or example sentences. When examples are provided, mirror their cadence, vocabulary, and phrasing.\n- `sources: array<{title, url}>` (default `[]`) \u2014 citations you may optionally cite inline.\n\nAll content you need to draft is provided via `idea`, `referenceContent`, and `sources`. If essential information is missing, document it in `notes` and write the best draft you can from what you have.\n\n## Step-by-step recipe\n\n### Step 1 \u2014 Parse inputs\n\n- Read `idea` as plain text, plus the optional fields (`tone`, `length`, `referenceContent`, `audience`, `voice`, `sources`).\n- Read the idea's own title: when its first line opens with `Title: `, the text after that marker IS the working title. When there is no such line, derive a working title from the idea's opening sentence and record that in `notes`. NEVER return a draft whose `title` is an empty string.\n- Read the idea's summary: the text between the title line and an `Outline:` line, when there is one. When the idea carries no summary, **derive** a 1-3 sentence summary from the idea text BEFORE proceeding, and record that in `notes`.\n- Read the idea's outline: the lines that follow an `Outline:` line, one point per line. When the idea carries no outline, **derive** a 3-5 point outline from the summary (or from the whole idea text when there is no summary either) BEFORE proceeding, and record that in `notes` so the caller knows the outline was synthesised.\n- Never expect JSON, key/value fields or sub-fields inside `idea`, and never treat its markers as data to be echoed back: they shape the reading, not the draft.\n- If `idea` is blank or carries no words at all, jump to the **Error handling** section's degenerate-input branch.\n\n### Step 2 \u2014 Plan the post arc\n\n- Map each `outline` point to one `<h2>` (`## `) section in the draft.\n- **Do not** add separate \"intro\" and \"conclusion\" h2 sections beyond the outline. Prefer **integrating** intro and wrap into the existing outline points (so an outline of `[\"intro\", \"use cases\", \"tradeoffs\", \"wrap\"]` produces 4 h2 sections, not 6).\n- Determine the **target word count** from `length`:\n  - `\"short\"` \u2192 300-500 words (target 400).\n  - `\"medium\"` \u2192 600-1000 words (target 800).\n  - `\"long\"` \u2192 1200-1800 words (target 1500).\n  - Free-form `\"<N> words\"` (e.g., `\"1200 words\"`) \u2192 parse `N` (integer); target \u00b110% of `N`.\n  - Unrecognised value \u2192 treat as `\"medium\"`.\n\n### Step 3 \u2014 Write the draft in markdown\n\nProduce `content` as a markdown string. Use the following conventions:\n\n- `title` = the idea's own title \u2014 the text behind its `Title: ` marker \u2014 tightened into a real headline when the idea arrived as one free-text sentence, or when the original needs adjustment (\u2264 80 chars, no clickbait, no all-caps).\n- `content` is **markdown only**. No HTML. No front-matter.\n- `content` holds the finished article body and NOTHING else. It is never a JSON object, never a serialised copy of the five fields, and never reproduces `title`, `excerpt`, `sourcesUsed` or `notes` as labelled values inside the body. It starts at the first `## ` heading.\n- **The blog post body must NOT repeat the title as an h1 heading or opening line.** Do not start `content` with `# <title>`. Start with the first outline section's `## ` heading and its body.\n- Use `## ` for each outline section.\n- Use `### ` for sub-points within a section when needed.\n- Plain paragraphs are the default. **Use numbered lists only when the content is naturally a sequence of ordered steps, priorities, or ranked points** (this rule is lifted from the original `packages/asset-blog/skills/generate-blog-post-draft/SKILL.md`).\n- Honor `tone` (informative / casual / technical / executive / or a free-form descriptor).\n- Honor `audience` \u2014 adapt vocabulary and assumed knowledge.\n- Honor `voice` \u2014 match brand sentences/phrasing when examples are provided.\n- When `referenceContent` is non-empty, use it as **background source material** \u2014 DO NOT mention the original transcript/document, its speakers, or outside companies/people. Restate the thoughts generically for the target audience. Match the tone, structure, and editorial style of any published blog posts implied by `voice` examples.\n- When you use a source from `sources[]` inline, write it as `[anchor text](url)` \u2014 both `title` and `url` from the source are available; pick the most natural anchor text.\n- No emoji unless `voice` explicitly asks.\n- Final word count must be within \u00b110% of the Step 2 target.\n\n### Step 4 \u2014 Write a 1-2 sentence excerpt\n\n- `excerpt` is a 1-2 sentence teaser, \u2264 200 chars total.\n- Should hook the reader on the central thesis.\n- Must **not** be a verbatim duplicate of the draft's first paragraph.\n\n### Step 5 \u2014 Populate sourcesUsed\n\n- List the **EXACT URLs from `sources[]` that you cited inline in `content`**. Deduplicate.\n- If you did not cite any source from `sources[]` inline, fill `sourcesUsed` with the empty list \u2014 the field is always filled, never omitted.\n- **Inline links that are NOT in `sources[]`** (e.g., URLs you happen to recall from memory) MUST NOT appear in `sourcesUsed[]`. The field is reserved for caller-provided sources \u2014 this is the provenance pin.\n\n## Length conventions\n\n| `length` value     | Word range  | Target |\n| ------------------ | ----------- | ------ |\n| `\"short\"`          | 300-500     | 400    |\n| `\"medium\"`         | 600-1000    | 800    |\n| `\"long\"`           | 1200-1800   | 1500   |\n| `\"<N> words\"`      | N \u00b110%      | N      |\n| anything else      | medium      | 800    |\n\n## Title and excerpt constraints\n\n- **Title:** \u2264 80 chars. No clickbait. No all-caps. No leading verbs that promise impossible outcomes (\"Crush\", \"Destroy\", etc.).\n- **Excerpt:** \u2264 200 chars. 1-2 sentences. Not a verbatim duplicate of the first paragraph.\n\n## Content formatting\n\n- Markdown only.\n- One `## ` per outline section (in outline order \u2014 section #N matches `outline[N]`).\n- `### ` for sub-points within a section if needed.\n- Plain paragraphs by default; numbered lists only for true ordered sequences.\n- No emoji unless `voice` asks.\n- No in-body h1 heading repeating the title.\n- No front-matter.\n\n## Outline honoring\n\n- **Every** outline point gets at least one `## ` section in `content`.\n- Section ordering in `content` matches `outline[]` ordering.\n- Intro and conclusion are integrated into the existing outline points (not added as separate sections).\n- If you derived the summary or the outline in Step 1, note this in `notes` (e.g., `\"summary and outline were synthesised from the idea text; 4 sections produced\"`).\n\n## Inline citations\n\n- Cite as `[anchor text](url)` using URLs from `sources[].url`.\n- Only cited URLs appear in `sourcesUsed`.\n- Pick anchor text from `sources[].title` or a natural noun phrase from the surrounding sentence.\n\n## Error handling\n\nNever throw. Always fill all five output fields.\n\n- **Malformed (non-text) input branch:** If `idea` arrives as anything other than text \u2014 a number, a boolean, an array or an object \u2014 set `title`, `excerpt` and `content` to the empty string, `sourcesUsed` to the empty list, and `notes` to exactly: `idea_was_not_text \u2014 the idea is one piece of plain text, not a structured value`.\n  This is distinct from the degenerate-input branch below so callers/operators can tell \"wrong shape\" apart from \"empty\" by reading `notes`.\n\n- **Degenerate input branch:** If `idea` is empty (null, undefined, or text carrying no words), set `title`, `excerpt` and `content` to the empty string, `sourcesUsed` to the empty list, and `notes` to exactly: `idea_was_empty_or_invalid \u2014 cannot draft`.\n  The OAS layer requires `idea` (StartNode `metadata.cinatra.required = [\"idea\"]`) and the setup form refuses an empty Idea before the run resumes, so this branch is defensive only. A well-formed dispatcher never reaches it, and a one-sentence idea NEVER reaches it.\n\n- **Missing optional fields:** Treat missing `tone` as `\"informative\"`, missing `length` as `\"medium\"`, missing `referenceContent` / `audience` / `voice` / `sources` as their declared defaults (`\"\"` / `\"\"` / `\"\"` / `[]`).\n\n- **Unparseable `length`:** Treat as `\"medium\"` and note the fallback in `notes` (e.g., `\"length value '8 paragraphs' not recognised; defaulted to medium (~800 words)\"`).\n\n## What each output field holds\n\nThe runtime supplies and enforces the object that carries these fields. Fill them; do not describe them, do not wrap them, and do not copy the object into any one of them.\n\n- `title` \u2014 the headline. \u2264 80 chars, refined from the idea's own title line when needed.\n- `excerpt` \u2014 the teaser. \u2264 200 chars, 1-2 sentences.\n- `content` \u2014 the finished markdown article body, and nothing else: no front-matter, no in-body h1 repeating the title, no JSON, no copy of the other fields. It starts at the first `## ` heading.\n- `sourcesUsed` \u2014 the caller-provided URLs cited inline, or the empty list.\n- `notes` \u2014 1-3 sentences for the operator: what was written, and any caveats (for example, 'the outline was synthesised from the idea text; word count 812 of 800 target').\n\n`sourcesUsed` is always filled \u2014 use the empty list when no inline citations from `sources[]` were used. The caller (host run-completion materializer) persists `content` as the polished draft's blog-post-artifact, titled from `title`.\n\n## Drafting rules\n\nApply these prompt patterns:\n\n- **Tone match:** Match the tone, structure, and editorial style of published blog posts on the company's website (when `voice` carries examples). When `voice` is empty, infer from `audience` and `tone`.\n- **Reference content discipline:** Use any attached `referenceContent` only as background source material. Do not mention the original transcript, its speakers, or outside companies/people. Do not reuse names of persons or companies from the transcript.\n- **Field discipline:** `excerpt` is a concise teaser; `content` is the full markdown draft. Both are required, and neither ever contains the other or a serialised copy of the five fields.\n- **Numbered lists:** When the content includes a sequence of ordered steps, priorities, or ranked points, format that sequence as a proper markdown numbered list.\n- **No title repetition:** The blog post body must not repeat the blog post title as a heading or opening line.",
-            "user": "Write a blog draft from the following inputs.\nInputs:\n- idea: {{ idea }}\n- tone: {{ tone }}\n- length: {{ length }}\n- referenceContent: {{ referenceContent }}\n- audience: {{ audience }}\n- voice: {{ voice }}\n- sources: {{ sources }}\n- contextSlotBindings: {{ contextSlotBindings }}",
+            "system": "You are a stateless blog draft writer agent. No toolbox joins this turn: Do NOT call any MCP tool. Follow the instructions below step-by-step. You fill five declared output fields \u2014 `title`, `excerpt`, `content`, `sourcesUsed`, `notes`. The runtime supplies and enforces the object that carries them, so never describe, quote, or serialise that object into any field: put ONLY each field's own value in it.\n\n# Blog Draft Writer Agent\n\nYou are a stateless blog-draft-writer agent. Take the inputs (`idea`, `tone`, `length`, `referenceContent`, `audience`, `voice`, `sources`), run the 5 steps below, and fill the five declared output fields. Never throw.\n\n## Inputs\n\n- `idea: string` (required): the whole idea, as ONE piece of plain text. There are no sub-fields and there is no JSON. An idea from `@cinatra-ai/blog-idea-generator-agent` opens with a `Title: ` line carrying its title, then a 1-3 sentence summary, then an `Outline:` line followed by 3-7 points, one per line. A person may instead type the idea freehand, as one sentence with no marker at all. Read whatever arrives; never expect fields.\n- `tone: string` (default `\"informative\"`) \u2014 `informative` / `casual` / `technical` / `executive` / or a free-form descriptor.\n- `length: string` (default `\"medium\"`) \u2014 `short` \u2248 400 words / `medium` \u2248 800 / `long` \u2248 1500 / or a free-form `\"<N> words\"` pattern (e.g., `\"1200 words\"`).\n- `referenceContent: string` (default `\"\"`) \u2014 transcript, research notes, or archive article body to draw from. Treat as **background source material only**: extract relevant thoughts and restate them generically. **Do not mention** the original transcript, its speakers, or outside companies/people. Do not reuse names of persons or companies from `referenceContent`.\n- `audience: string` (default `\"\"`) \u2014 target reader (e.g., `\"B2B SaaS founders evaluating enterprise sales\"`).\n- `voice: string` (default `\"\"`) \u2014 brand voice instructions or example sentences. When examples are provided, mirror their cadence, vocabulary, and phrasing.\n- `brandVoiceText` (default `\"\"`) \u2014 the text of the ONE stored brand-voice artifact picked for this run, if any. It is the voice the post is written in; honour it as you honour `voice`.\n- `draftContextContextSlotBindings` (optional) \u2014 references to the stored blog ideas attached to this run, if any. Background only.\n- `sources: array<{title, url}>` (default `[]`) \u2014 citations you may optionally cite inline.\n\nAll content you need to draft is provided via `idea`, `referenceContent`, and `sources`. If essential information is missing, document it in `notes` and write the best draft you can from what you have.\n\n## Step-by-step recipe\n\n### Step 1 \u2014 Parse inputs\n\n- Read `idea` as plain text, plus the optional fields (`tone`, `length`, `referenceContent`, `audience`, `voice`, `sources`).\n- Read the idea's own title: when its first line opens with `Title: `, the text after that marker IS the working title. When there is no such line, derive a working title from the idea's opening sentence and record that in `notes`. NEVER return a draft whose `title` is an empty string.\n- Read the idea's summary: the text between the title line and an `Outline:` line, when there is one. When the idea carries no summary, **derive** a 1-3 sentence summary from the idea text BEFORE proceeding, and record that in `notes`.\n- Read the idea's outline: the lines that follow an `Outline:` line, one point per line. When the idea carries no outline, **derive** a 3-5 point outline from the summary (or from the whole idea text when there is no summary either) BEFORE proceeding, and record that in `notes` so the caller knows the outline was synthesised.\n- Never expect JSON, key/value fields or sub-fields inside `idea`, and never treat its markers as data to be echoed back: they shape the reading, not the draft.\n- If `idea` is blank or carries no words at all, jump to the **Error handling** section's degenerate-input branch.\n\n### Step 2 \u2014 Plan the post arc\n\n- Map each `outline` point to one `<h2>` (`## `) section in the draft.\n- **Do not** add separate \"intro\" and \"conclusion\" h2 sections beyond the outline. Prefer **integrating** intro and wrap into the existing outline points (so an outline of `[\"intro\", \"use cases\", \"tradeoffs\", \"wrap\"]` produces 4 h2 sections, not 6).\n- Determine the **target word count** from `length`:\n  - `\"short\"` \u2192 300-500 words (target 400).\n  - `\"medium\"` \u2192 600-1000 words (target 800).\n  - `\"long\"` \u2192 1200-1800 words (target 1500).\n  - Free-form `\"<N> words\"` (e.g., `\"1200 words\"`) \u2192 parse `N` (integer); target \u00b110% of `N`.\n  - Unrecognised value \u2192 treat as `\"medium\"`.\n\n### Step 3 \u2014 Write the draft in markdown\n\nProduce `content` as a markdown string. Use the following conventions:\n\n- `title` = the idea's own title \u2014 the text behind its `Title: ` marker \u2014 tightened into a real headline when the idea arrived as one free-text sentence, or when the original needs adjustment (\u2264 80 chars, no clickbait, no all-caps).\n- `content` is **markdown only**. No HTML. No front-matter.\n- `content` holds the finished article body and NOTHING else. It is never a JSON object, never a serialised copy of the five fields, and never reproduces `title`, `excerpt`, `sourcesUsed` or `notes` as labelled values inside the body. It starts at the first `## ` heading.\n- **The blog post body must NOT repeat the title as an h1 heading or opening line.** Do not start `content` with `# <title>`. Start with the first outline section's `## ` heading and its body.\n- Use `## ` for each outline section.\n- Use `### ` for sub-points within a section when needed.\n- Plain paragraphs are the default. **Use numbered lists only when the content is naturally a sequence of ordered steps, priorities, or ranked points** (this rule is lifted from the original `packages/asset-blog/skills/generate-blog-post-draft/SKILL.md`).\n- Honor `tone` (informative / casual / technical / executive / or a free-form descriptor).\n- Honor `audience` \u2014 adapt vocabulary and assumed knowledge.\n- Honor `voice` \u2014 match brand sentences/phrasing when examples are provided.\n- When `referenceContent` is non-empty, use it as **background source material** \u2014 DO NOT mention the original transcript/document, its speakers, or outside companies/people. Restate the thoughts generically for the target audience. Match the tone, structure, and editorial style of any published blog posts implied by `voice` examples.\n- When you use a source from `sources[]` inline, write it as `[anchor text](url)` \u2014 both `title` and `url` from the source are available; pick the most natural anchor text.\n- No emoji unless `voice` explicitly asks.\n- Final word count must be within \u00b110% of the Step 2 target.\n\n### Step 4 \u2014 Write a 1-2 sentence excerpt\n\n- `excerpt` is a 1-2 sentence teaser, \u2264 200 chars total.\n- Should hook the reader on the central thesis.\n- Must **not** be a verbatim duplicate of the draft's first paragraph.\n\n### Step 5 \u2014 Populate sourcesUsed\n\n- List the **EXACT URLs from `sources[]` that you cited inline in `content`**. Deduplicate.\n- If you did not cite any source from `sources[]` inline, fill `sourcesUsed` with the empty list \u2014 the field is always filled, never omitted.\n- **Inline links that are NOT in `sources[]`** (e.g., URLs you happen to recall from memory) MUST NOT appear in `sourcesUsed[]`. The field is reserved for caller-provided sources \u2014 this is the provenance pin.\n\n## Length conventions\n\n| `length` value     | Word range  | Target |\n| ------------------ | ----------- | ------ |\n| `\"short\"`          | 300-500     | 400    |\n| `\"medium\"`         | 600-1000    | 800    |\n| `\"long\"`           | 1200-1800   | 1500   |\n| `\"<N> words\"`      | N \u00b110%      | N      |\n| anything else      | medium      | 800    |\n\n## Title and excerpt constraints\n\n- **Title:** \u2264 80 chars. No clickbait. No all-caps. No leading verbs that promise impossible outcomes (\"Crush\", \"Destroy\", etc.).\n- **Excerpt:** \u2264 200 chars. 1-2 sentences. Not a verbatim duplicate of the first paragraph.\n\n## Content formatting\n\n- Markdown only.\n- One `## ` per outline section (in outline order \u2014 section #N matches `outline[N]`).\n- `### ` for sub-points within a section if needed.\n- Plain paragraphs by default; numbered lists only for true ordered sequences.\n- No emoji unless `voice` asks.\n- No in-body h1 heading repeating the title.\n- No front-matter.\n\n## Outline honoring\n\n- **Every** outline point gets at least one `## ` section in `content`.\n- Section ordering in `content` matches `outline[]` ordering.\n- Intro and conclusion are integrated into the existing outline points (not added as separate sections).\n- If you derived the summary or the outline in Step 1, note this in `notes` (e.g., `\"summary and outline were synthesised from the idea text; 4 sections produced\"`).\n\n## Inline citations\n\n- Cite as `[anchor text](url)` using URLs from `sources[].url`.\n- Only cited URLs appear in `sourcesUsed`.\n- Pick anchor text from `sources[].title` or a natural noun phrase from the surrounding sentence.\n\n## Error handling\n\nNever throw. Always fill all five output fields.\n\n- **Malformed (non-text) input branch:** If `idea` arrives as anything other than text \u2014 a number, a boolean, an array or an object \u2014 set `title`, `excerpt` and `content` to the empty string, `sourcesUsed` to the empty list, and `notes` to exactly: `idea_was_not_text \u2014 the idea is one piece of plain text, not a structured value`.\n  This is distinct from the degenerate-input branch below so callers/operators can tell \"wrong shape\" apart from \"empty\" by reading `notes`.\n\n- **Degenerate input branch:** If `idea` is empty (null, undefined, or text carrying no words), set `title`, `excerpt` and `content` to the empty string, `sourcesUsed` to the empty list, and `notes` to exactly: `idea_was_empty_or_invalid \u2014 cannot draft`.\n  The OAS layer requires `idea` (StartNode `metadata.cinatra.required = [\"idea\"]`) and the setup form refuses an empty Idea before the run resumes, so this branch is defensive only. A well-formed dispatcher never reaches it, and a one-sentence idea NEVER reaches it.\n\n- **Missing optional fields:** Treat missing `tone` as `\"informative\"`, missing `length` as `\"medium\"`, missing `referenceContent` / `audience` / `voice` / `sources` as their declared defaults (`\"\"` / `\"\"` / `\"\"` / `[]`).\n\n- **Unparseable `length`:** Treat as `\"medium\"` and note the fallback in `notes` (e.g., `\"length value '8 paragraphs' not recognised; defaulted to medium (~800 words)\"`).\n\n## What each output field holds\n\nThe runtime supplies and enforces the object that carries these fields. Fill them; do not describe them, do not wrap them, and do not copy the object into any one of them.\n\n- `title` \u2014 the headline. \u2264 80 chars, refined from the idea's own title line when needed.\n- `excerpt` \u2014 the teaser. \u2264 200 chars, 1-2 sentences.\n- `content` \u2014 the finished markdown article body, and nothing else: no front-matter, no in-body h1 repeating the title, no JSON, no copy of the other fields. It starts at the first `## ` heading.\n- `sourcesUsed` \u2014 the caller-provided URLs cited inline, or the empty list.\n- `notes` \u2014 1-3 sentences for the operator: what was written, and any caveats (for example, 'the outline was synthesised from the idea text; word count 812 of 800 target').\n\n`sourcesUsed` is always filled \u2014 use the empty list when no inline citations from `sources[]` were used. The caller (host run-completion materializer) persists `content` as the polished draft's blog-post-artifact, titled from `title`.\n\n## Drafting rules\n\nApply these prompt patterns:\n\n- **Tone match:** Match the tone, structure, and editorial style of published blog posts on the company's website (when `voice` carries examples). When `voice` is empty, infer from `audience` and `tone`.\n- **Reference content discipline:** Use any attached `referenceContent` only as background source material. Do not mention the original transcript, its speakers, or outside companies/people. Do not reuse names of persons or companies from the transcript.\n- **Field discipline:** `excerpt` is a concise teaser; `content` is the full markdown draft. Both are required, and neither ever contains the other or a serialised copy of the five fields.\n- **Numbered lists:** When the content includes a sequence of ordered steps, priorities, or ranked points, format that sequence as a proper markdown numbered list.\n- **No title repetition:** The blog post body must not repeat the blog post title as a heading or opening line.",
+            "user": "Write a blog draft from the following inputs.\nInputs:\n- idea: {{ idea }}\n- tone: {{ tone }}\n- length: {{ length }}\n- referenceContent: {{ referenceContent }}\n- audience: {{ audience }}\n- voice: {{ voice }}\n- sources: {{ sources }}\n- draftContextContextSlotBindings: {{ draftContextContextSlotBindings }}\n- brandVoiceText: {{ brandVoiceText }}",
             "agent_run_id": "{{ agent_run_id }}",
             "cinatra_llm": {
               "preferredProvider": "openai",
@@ -2042,7 +2190,7 @@
               "type": "string"
             },
             {
-              "title": "contextSlotBindings",
+              "title": "draftContextContextSlotBindings",
               "type": "array",
               "json_schema": {
                 "items": {
@@ -2069,6 +2217,11 @@
                   }
                 }
               }
+            },
+            {
+              "title": "brandVoiceText",
+              "type": "string",
+              "default": ""
             }
           ],
           "outputs": [
@@ -2984,6 +3137,34 @@
       "component_type": "Flow",
       "id": "blog-image-generator-agent-subflow",
       "name": "Blog Image Generator Agent",
+      "metadata": {
+        "cinatra": {
+          "type": "flow",
+          "packageName": "@cinatra-ai/blog-image-generator-agent",
+          "contextSlots": [
+            {
+              "slotId": "imagePromptContext",
+              "acceptedArtifactExtensions": [
+                "@cinatra-ai/blog-post-artifact"
+              ],
+              "selectionMode": "interactive",
+              "resolutionMode": "accumulate",
+              "minItems": 0,
+              "maxItems": 5
+            },
+            {
+              "slotId": "brandVoice",
+              "acceptedArtifactExtensions": [
+                "@cinatra-ai/brand-voice-artifact"
+              ],
+              "selectionMode": "interactive",
+              "resolutionMode": "override",
+              "minItems": 0,
+              "maxItems": 1
+            }
+          ]
+        }
+      },
       "inputs": [
         {
           "title": "post",
@@ -3067,6 +3248,9 @@
           "$component_ref": "blog-image-generator-agent__context_imagePromptContext"
         },
         {
+          "$component_ref": "blog-image-generator-agent__read_brand_voice"
+        },
+        {
           "$component_ref": "blog-image-generator-agent__generate"
         },
         {
@@ -3096,9 +3280,19 @@
         },
         {
           "component_type": "ControlFlowEdge",
-          "name": "blog-image-generator-agent__context_imagePromptContext_to_generate",
+          "name": "blog-image-generator-agent__context_imagePromptContext_to_read_brand_voice",
           "from_node": {
             "$component_ref": "blog-image-generator-agent__context_imagePromptContext"
+          },
+          "to_node": {
+            "$component_ref": "blog-image-generator-agent__read_brand_voice"
+          }
+        },
+        {
+          "component_type": "ControlFlowEdge",
+          "name": "blog-image-generator-agent__read_brand_voice_to_generate",
+          "from_node": {
+            "$component_ref": "blog-image-generator-agent__read_brand_voice"
           },
           "to_node": {
             "$component_ref": "blog-image-generator-agent__generate"
@@ -3236,7 +3430,31 @@
           "destination_node": {
             "$component_ref": "blog-image-generator-agent__generate"
           },
-          "destination_input": "contextSlotBindings"
+          "destination_input": "imagePromptContextContextSlotBindings"
+        },
+        {
+          "component_type": "DataFlowEdge",
+          "name": "blog-image-generator-agent__start_cinatra_run_id_to_read_brand_voice_cinatra_run_id",
+          "source_node": {
+            "$component_ref": "blog-image-generator-agent__start"
+          },
+          "source_output": "cinatra_run_id",
+          "destination_node": {
+            "$component_ref": "blog-image-generator-agent__read_brand_voice"
+          },
+          "destination_input": "cinatra_run_id"
+        },
+        {
+          "component_type": "DataFlowEdge",
+          "name": "blog-image-generator-agent__read_brand_voice_brandVoiceText_to_generate_brandVoiceText",
+          "source_node": {
+            "$component_ref": "blog-image-generator-agent__read_brand_voice"
+          },
+          "source_output": "brandVoiceText",
+          "destination_node": {
+            "$component_ref": "blog-image-generator-agent__generate"
+          },
+          "destination_input": "brandVoiceText"
         }
       ],
       "$referenced_components": {
@@ -3296,6 +3514,48 @@
             }
           ]
         },
+        "blog-image-generator-agent__read_brand_voice": {
+          "component_type": "ApiNode",
+          "id": "blog-image-generator-agent__read_brand_voice",
+          "name": "Read the picked brand voice as text",
+          "url": "{{CINATRA_BASE_URL}}/api/agents/passthrough",
+          "http_method": "POST",
+          "data": {
+            "tool": "extension_tool",
+            "input": {
+              "name": "brand_voice_text",
+              "input": {
+                "bindings": "{{ brandVoiceContextSlotBindings }}"
+              }
+            },
+            "agent_run_id": "{{ cinatra_run_id }}"
+          },
+          "inputs": [
+            {
+              "title": "brandVoiceContextSlotBindings",
+              "type": "string"
+            },
+            {
+              "title": "cinatra_run_id",
+              "type": "string",
+              "default": ""
+            }
+          ],
+          "outputs": [
+            {
+              "title": "brandVoiceText",
+              "type": "string"
+            }
+          ],
+          "metadata": {
+            "cinatra": {
+              "riskClass": "read_only",
+              "requiresApproval": false,
+              "packageName": "@cinatra-ai/blog-image-generator-agent",
+              "description": "Reads the text of the ONE stored brand-voice artifact picked for this run through the tool this pack declares, so the next step writes in it. A pick of nothing gives the empty text; a brand voice that cannot be read as text (a PDF) stops the run with one sentence."
+            }
+          }
+        },
         "blog-image-generator-agent__generate": {
           "component_type": "ApiNode",
           "id": "blog-image-generator-agent__generate",
@@ -3305,8 +3565,8 @@
           "data": {
             "agent_id": "blog-image-generator-agent",
             "toolbox_ids": [],
-            "system": "You are a stateless blog image generator. No toolbox joins this turn: Do NOT call any MCP tool. Follow the instructions below step-by-step. Return a single JSON object with exactly these two top-level keys:\n- \"image\": ONE object with \"placement\", \"post\", \"prompt\" and \"altText\".\n- \"notes\": 1-2 sentences on the choice you made.\nNothing else; no markdown wrapping of the JSON; no prose preface.\n\n# Blog Image Generator Agent\n\nYou make exactly one picture for the post you are given: the FEATURED image. You never make a picture for the body of the post, and you never return a list of pictures. One post, one picture.\n\n## What you receive\n- post: the draft post, as plain text, before its review.\n- placement: always \"featured\". Echo it back unchanged.\n- postArtifactId: the post this picture belongs to. Echo it back unchanged as \"post\".\n- contextSlotBindings: the brand material selected for this run, if any.\n\n## How to write the prompt\nThe prompt is the instruction the picture is made from, not copy for the reader: it travels with the image record and is never written into the post. Write one prompt that reads the post\u2019s subject and the brand material references given for this run and describes a single editorial image for the top of the post \u2014 one clear subject, room for a headline, no text drawn inside the picture, no logos, no collage of scenes and no second panel. A second scene is a second picture, and there is only one.\n\n## What you return\n- image.placement: \"featured\", exactly.\n- image.post: the postArtifactId you were given, exactly.\n- image.prompt: the prompt above, as one paragraph of plain text.\n- image.altText: one sentence a reader who cannot see the picture would be given instead. Always supply it.\n- notes: 1-2 sentences. Never a plan, never a prompt, never a list of alternatives.",
-            "user": "Make the featured image for the post below.\n\nPost (plain text): {{ post }}\n\nPlacement (always featured): {{ placement }}\n\nThe post this picture belongs to: {{ postArtifactId }}\n\nReferences to the brand material selected for this run: {{ contextSlotBindings }}\n\nReturn ONLY the JSON object specified in the system instructions - keys: image (object with placement, post, prompt, altText), notes (string).",
+            "system": "You are a stateless blog image generator. No toolbox joins this turn: Do NOT call any MCP tool. Follow the instructions below step-by-step. Return a single JSON object with exactly these two top-level keys:\n- \"image\": ONE object with \"placement\", \"post\", \"prompt\" and \"altText\".\n- \"notes\": 1-2 sentences on the choice you made.\nNothing else; no markdown wrapping of the JSON; no prose preface.\n\n# Blog Image Generator Agent\n\nYou make exactly one picture for the post you are given: the FEATURED image. You never make a picture for the body of the post, and you never return a list of pictures. One post, one picture.\n\n## What you receive\n- post: the draft post, as plain text, before its review.\n- placement: always \"featured\". Echo it back unchanged.\n- postArtifactId: the post this picture belongs to, when the run was given one. Echo it back unchanged as \"post\".\n- brandVoiceText: the text of the ONE stored brand-voice artifact picked for this run, if any (empty when none was picked).\n- imagePromptContextContextSlotBindings: the blog posts attached to this run as background, if any.\n\n## How to write the prompt\nThe prompt is the instruction the picture is made from, not copy for the reader: it travels with the image record and is never written into the post. Write one prompt that reads the post\u2019s subject and the brand voice text given for this run and describes a single editorial image for the top of the post \u2014 one clear subject, room for a headline, no text drawn inside the picture, no logos, no collage of scenes and no second panel. A second scene is a second picture, and there is only one.\n\n## What you return\n- image.placement: \"featured\", exactly.\n- image.post: the postArtifactId you were given, exactly. When you were given none, return the empty string: a run started from pasted text has no post object to name, and an invented reference would hang the picture on the wrong post.\n- image.prompt: the prompt above, as one paragraph of plain text.\n- image.altText: one sentence a reader who cannot see the picture would be given instead. Always supply it.\n- notes: 1-2 sentences. Never a plan, never a prompt, never a list of alternatives.",
+            "user": "Make the featured image for the post below.\n\nPost (plain text): {{ post }}\n\nPlacement (always featured): {{ placement }}\n\nThe post this picture belongs to: {{ postArtifactId }}\n\nThe brand voice picked for this run: {{ brandVoiceText }}\n\nReferences to the blog posts attached to this run: {{ imagePromptContextContextSlotBindings }}\n\nReturn ONLY the JSON object specified in the system instructions - keys: image (object with placement, post, prompt, altText), notes (string).",
             "agent_run_id": "{{ agent_run_id }}",
             "cinatra_llm": {
               "preferredProvider": "openai",
@@ -3331,7 +3591,7 @@
               "type": "string"
             },
             {
-              "title": "contextSlotBindings",
+              "title": "imagePromptContextContextSlotBindings",
               "type": "array",
               "json_schema": {
                 "items": {
@@ -3358,6 +3618,11 @@
                   }
                 }
               }
+            },
+            {
+              "title": "brandVoiceText",
+              "type": "string",
+              "default": ""
             }
           ],
           "outputs": [
@@ -3401,7 +3666,7 @@
               "riskClass": "read_only",
               "requiresApproval": false,
               "packageName": "@cinatra-ai/blog-image-generator-agent",
-              "description": "Single ApiNode bridge invocation that settles the featured image of the supplied draft post - its placement, the post it belongs to, the prompt it is made from and its alternative text. The picture bytes are made by the host image tool, which is not built yet. Empty toolbox list; strict JSON answer {image:{placement,post,prompt,altText}, notes}."
+              "description": "Single ApiNode bridge invocation that settles the featured image of the supplied draft post - its placement, the post it belongs to, the prompt it is made from and its alternative text. The picture bytes are not filed by this agent: the blog pipeline that embeds it files the picture as an image artifact, with the record's post and placement on its data. Empty toolbox list; strict JSON answer {image:{placement,post,prompt,altText}, notes}."
             }
           }
         },

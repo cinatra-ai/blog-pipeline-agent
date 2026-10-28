@@ -1,8 +1,8 @@
 // THE PIPELINE'S STEPS — plan (C) section 6.1, the walk a person makes.
 //
 // Every case below pins one sentence of that walk onto the flow definition, in
-// the order the walk happens: the stored ideas offered as a real list, the pick
-// that is its own reservation, the brand voice the post is written in, the draft
+// the order the walk happens: the brand voice the post is written in, the stored
+// ideas offered as a real list, the pick that is its own reservation, the draft
 // written while the run is still going,
 // the picture made before anyone reviews anything, the review opened on what the
 // run made, the LinkedIn post at the end, and the pauses the pipeline really has.
@@ -333,12 +333,15 @@ test("the end node binds nothing: everything the run makes is written while it r
 // ---------------------------------------------------------------------------
 
 test("the pipeline has exactly the four pauses of its own that the walk describes", () => {
-  // The rail a person reads is the pipeline's declared pauses, in the walk's
-  // order: the idea, the brand voice the post is written in, the review of what
-  // the run made, and the LinkedIn post.
+  // The rail a person reads is the pipeline's declared pauses: the brand voice
+  // the post is written in, the idea, the review of what the run made, and the
+  // LinkedIn post. The brand-voice pause is the flow's declared context slot
+  // (cinatra#4314): the host puts its list step in front of the run, so the
+  // file carries the declaration, and the other three are gates of this flow.
+  const slots = oas.metadata.cinatra.contextSlots ?? [];
+  assert.deepEqual(slots.map((s) => s.slotId), ["brandVoice"]);
   assert.deepEqual(nodesOfType("InputMessageNode"), [
     "idea_selection_gate",
-    "brand_voice_gate",
     "draft_review_gate",
     "linkedin_review_gate",
   ]);
@@ -350,38 +353,74 @@ test("the pipeline has exactly the four pauses of its own that the walk describe
 
 test("the run parks for the brand-voice pick before any draft is written", () => {
   // Plan (C) section 6: one pause for brand voice, before the draft. The pause
-  // is a gate of this flow's own, shaped like the other three so the host draws
-  // it as a rail entry.
-  const gate = parts.brand_voice_gate;
-  assert.ok(gate, "the flow declares the brand-voice pause");
-  assert.equal(gate.component_type, "InputMessageNode", "a gate the runner parks on");
-  assert.equal(gate.metadata.cinatra.requiresApproval, true);
-  assert.equal(gate.metadata.cinatra.riskClass, "read_only");
-  assert.ok(gate.metadata.cinatra.a2uiSurfaceId, "the host is told which surface draws it");
-  assert.ok(at("reserve_idea") < at("brand_voice_gate"), "the idea is taken first");
-  assert.ok(at("brand_voice_gate") < at("draft_flow"), "the voice is picked before the writer runs");
-  assert.ok(at("brand_voice_gate") < at("write_draft"), "and nothing is written before the pick");
-  const schema = gate.metadata.cinatra.inputMessageSchema;
+  // is the flow's declared brand-voice slot; the host injects its list step
+  // directly after the start, so it parks the run before the idea, the writer
+  // and every write (cinatra-ai/cinatra#4314; test/brand-voice-pick-3035).
+  const slot = (oas.metadata.cinatra.contextSlots ?? []).find((s) => s.slotId === "brandVoice");
+  assert.ok(slot, "the flow declares the brand-voice pause");
+  assert.equal(slot.selectionMode, "interactive", "a person picks; nothing is picked for them");
+  assert.equal(parts.brand_voice_gate, undefined, "the free-text pause is gone");
+  // The host puts the list step in front of the start's own successor, and that
+  // successor is the step that takes the pick and reads its text: the brand
+  // voice comes first, then the stored ideas, then everything else.
+  const after = (id) =>
+    oas.control_flow_connections.filter((e) => e.from_node.$component_ref === id).map((e) => e.to_node.$component_ref);
+  assert.deepEqual(after("start"), ["read_brand_voice"], "the read of the pick is the start's only successor");
+  assert.deepEqual(after("read_brand_voice"), ["prepare_ideas"], "the stored ideas come after the brand voice");
   assert.ok(
-    schema.properties.brandVoice,
-    "the brand-voice material is the thing the gate asks a person to pick",
+    (parts.read_brand_voice.inputs ?? []).some((i) => i.title === "brandVoiceContextSlotBindings"),
+    "the start's successor is the step that takes the pick",
   );
-  const out = gate.outputs.find((o) => o.title === "brandVoice");
-  assert.ok(out, "and the pick leaves the gate as its own output");
-  assert.equal(out.default, "", "an unanswered pick is an empty voice, not a dead end");
+  assert.ok(at("read_brand_voice") < at("prepare_ideas") && at("prepare_ideas") < at("draft_flow"));
+  assert.ok(at("draft_flow") < at("write_draft"));
+});
+
+test("the descriptions name the pauses in the order the run makes them", () => {
+  for (const [where, text] of [["the flow", oas.description], ["the manifest", manifest.description]]) {
+    const voice = text.indexOf("brand-voice pick");
+    const ideas = text.indexOf("stored-ideas gate");
+    assert.ok(voice !== -1 && ideas !== -1, `${where} names both pauses`);
+    assert.ok(voice < ideas, `${where} names the brand-voice pick before the stored-ideas gate`);
+  }
+});
+
+test("an answer to an older run's removed pause cannot start this flow", () => {
+  // The host keeps a parked run's conversation in the mount's memory, so a
+  // changed pack or a restart loses it, and the person's answer to the old
+  // free-text pause then reaches this flow as the start of a new conversation.
+  // The loader keeps only the start inputs the flow declares; the answer names
+  // `brandVoice`, which is not one, and carries no `brief`. Because `brief` is
+  // required with no default, the start is refused and the run ends failed,
+  // before any step runs or anything is written.
+  const start = parts.start;
+  const brief = (start.inputs ?? []).find((i) => i.title === "brief");
+  assert.ok(brief, "the start takes the brief");
+  assert.ok(!("default" in brief), "the brief has no default, so a start without it is refused");
+  assert.equal(
+    (start.inputs ?? []).find((i) => i.title === "brandVoice"),
+    undefined,
+    "no start input takes the old pause's answer",
+  );
+  assert.ok(
+    (oas.inputs ?? []).some((i) => i.title === "brief" && !("default" in i)),
+    "the flow's own inputs keep the brief required",
+  );
 });
 
 test("the brand-voice pick is handed down to the writing step", () => {
-  // "One brand-voice pick handed down": the writer declares `voice` and, until
-  // this edge, nothing in the run ever filled it — every post was drafted with
-  // no voice at all.
-  const edge = edgeInto("draft_flow", "voice");
-  assert.ok(edge, "the draft writer's voice input is fed by the run");
-  assert.equal(edge.source_node.$component_ref, "brand_voice_gate", "by the pick a person made");
-  assert.equal(edge.source_output, "brandVoice");
-  const writer = parts[parts.draft_flow.subflow.$component_ref];
-  const declared = (writer.inputs ?? []).map((i) => i.title);
-  assert.ok(declared.includes("voice"), "and the writer really takes it");
+  // "One brand-voice pick handed down": the writer's own brand-voice slot is
+  // satisfied by the pipeline's pick, and no free text reaches its `voice`.
+  const lines = oas.metadata.cinatra.parentSatisfiedContextSlots ?? [];
+  assert.ok(
+    lines.some(
+      (l) =>
+        l.parentSlotId === "brandVoice" &&
+        l.childPackage === "@cinatra-ai/blog-draft-writer-agent" &&
+        l.childSlotId === "brandVoice",
+    ),
+    "the writer's brand-voice slot is satisfied by the pipeline's pick",
+  );
+  assert.equal(edgeInto("draft_flow", "voice"), undefined, "the pause hands the writer no voice text");
 });
 
 test("each pause is declared where a person reads what the pipeline does", () => {
@@ -554,9 +593,11 @@ test("every road from the start to the end passes the four pauses, in the walk's
     if (!next.has(from)) next.set(from, []);
     next.get(from).push(edge.to_node.$component_ref);
   }
+  // The brand-voice pause is the declared slot the host puts directly after
+  // the start (see above), so every road meets it first; these are the three
+  // gates of this flow's own graph.
   const gates = [
     "idea_selection_gate",
-    "brand_voice_gate",
     "draft_review_gate",
     "linkedin_review_gate",
   ];
@@ -579,14 +620,13 @@ test("every road from the start to the end passes the four pauses, in the walk's
     for (let i = 0; i < gates.length; i += 1) {
       assert.notEqual(seen[i], -1, `the road ${road.join("->")} skips ${gates[i]}`);
     }
-    assert.ok(seen[0] < seen[1], "the idea is chosen before the voice is picked");
-    assert.ok(seen[1] < seen[2], "the voice is picked before the draft is reviewed");
-    assert.ok(seen[2] < seen[3], "the draft is reviewed before the LinkedIn post is approved");
+    assert.ok(seen[0] < seen[1], "the idea is chosen before the draft is reviewed");
+    assert.ok(seen[1] < seen[2], "the draft is reviewed before the LinkedIn post is approved");
     // the preparation, the write and the picture are on every road too, and in order
     for (const [before, after] of [
       ["prepare_ideas", "idea_selection_gate"],
-      ["brand_voice_gate", "draft_flow"],
-      ["brand_voice_gate", "write_draft"],
+      ["reserve_idea", "draft_flow"],
+      ["reserve_idea", "write_draft"],
       ["write_draft", "image_flow"],
       ["image_flow", "draft_review_gate"],
     ]) {
