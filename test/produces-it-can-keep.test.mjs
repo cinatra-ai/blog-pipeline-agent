@@ -62,7 +62,7 @@ test("every declared production has a road that keeps it", () => {
   );
 });
 
-test("the four dependency edges stay — they say what the run touches", () => {
+test("the five dependency edges stay — they say what the run touches", () => {
   const names = (manifest.cinatra.dependencies || [])
     .filter((d) => d.kind === "artifact")
     .map((d) => d.packageName)
@@ -70,6 +70,7 @@ test("the four dependency edges stay — they say what the run touches", () => {
   assert.deepEqual(names, [
     "@cinatra-ai/blog-idea-artifact",
     "@cinatra-ai/blog-post-artifact",
+    "@cinatra-ai/brand-voice-artifact",
     "@cinatra-ai/image-artifact",
     "@cinatra-ai/linkedin-artifacts",
   ]);

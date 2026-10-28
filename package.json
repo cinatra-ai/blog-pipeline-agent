@@ -2,7 +2,7 @@
   "name": "@cinatra-ai/blog-pipeline-agent",
   "version": "0.2.4",
   "license": "Apache-2.0",
-  "description": "Parent orchestrator (WayFlow Flow OAS) that turns one stored blog idea into a reviewed blog post, its featured image and the LinkedIn post that announces it. Manual brief / reference artifacts input only; transcript input is not accepted. projectId threaded across children. Four HITL pauses of its own: the stored-ideas gate, the brand-voice pick handed down to the writing step, the review the run parks at, and the LinkedIn post; the review DECISION is core's (artifact-lifecycle interception), this flow declares the pause and names the run's own revisions as its targets.",
+  "description": "Parent orchestrator (WayFlow Flow OAS) that turns one stored blog idea into a reviewed blog post, its featured image and the LinkedIn post that announces it. Manual brief / reference artifacts input only; transcript input is not accepted. projectId threaded across children. Four HITL pauses of its own: the brand-voice pick handed down to the writing and image steps, then the stored-ideas gate, the review the run parks at, and the LinkedIn post; the review DECISION is core's (artifact-lifecycle interception), this flow declares the pause and names the run's own revisions as its targets.",
   "type": "module",
   "files": [
     "cinatra"
@@ -104,6 +104,16 @@
         },
         "requirement": "required",
         "kind": "artifact"
+      },
+      {
+        "packageName": "@cinatra-ai/brand-voice-artifact",
+        "edgeType": "runtime",
+        "versionConstraint": {
+          "kind": "semver-range",
+          "range": "^0.1.0"
+        },
+        "requirement": "required",
+        "kind": "artifact"
       }
     ],
     "fieldRenderers": [
@@ -151,6 +161,10 @@
       {
         "name": "stored_ideas",
         "module": "./cinatra/tools/stored-ideas.mjs"
+      },
+      {
+        "name": "brand_voice_text",
+        "module": "./cinatra/tools/brand-voice-text.mjs"
       }
     ],
     "declaredTables": [
