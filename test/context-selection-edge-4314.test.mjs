@@ -1,9 +1,13 @@
 // The flow's brand-voice pick (cinatra-ai/cinatra#4314) is a declared context
-// slot that the host draws with the context-selection agent's screen. The host
-// resolves the slot through the node its loader injects at mount, and it counts
-// that injected node as the slot's wiring only when the package declares an
-// install-blocking edge on that agent (cinatra
-// `packages/extensions/src/__tests__/contextslots-require-explicit-context-selection-agent.test.ts`).
+// slot that the host draws with the context-selection agent's screen. On cinatra
+// main (f92c1f2e), the host's context-slot invariant
+// (`packages/extensions/src/__tests__/contextslots-require-explicit-context-selection-agent.test.ts`)
+// requires an install-blocking edge on that agent from every agent that declares
+// a context slot, and also an explicit, author-placed context FlowNode. The
+// amended invariant in cinatra-ai/cinatra#4408, which is not yet on main, drops
+// the FlowNode rule for a declaration-only slot like this one: it counts the node
+// the loader injects at mount as the slot's wiring, but only when the package
+// declares that edge. So main and the amended invariant both require the edge.
 // Without the edge, the pick could resolve against an agent that was never
 // installed.
 //
