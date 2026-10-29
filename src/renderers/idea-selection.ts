@@ -1,6 +1,6 @@
 "use client";
 
-import { createElement, Fragment, useState, type KeyboardEvent } from "react";
+import { createElement, Fragment, useEffect, useState, type KeyboardEvent } from "react";
 
 // The idea step's own renderer (cinatra#3035). The one field-renderer binding
 // this pack declares names this module as its `component.entry`, so the runtime
@@ -11,6 +11,14 @@ import { createElement, Fragment, useState, type KeyboardEvent } from "react";
 // committed as JSON into BOTH keys. NOTHING IS PICKED FOR ANYONE: the list starts
 // with no selection and commits only what a person actually chooses, and what it
 // commits is the REFERENCE the offer named, never a title.
+//
+// THE PICK IS DECLARED REQUIRED. The gate's schema marks `selectedIdeaJson`
+// `"x-required": true`, so the host keeps the step's Continue unavailable until
+// this renderer has written a value for it. With ideas on offer that value is
+// the person's pick. With no idea on offer there is nothing to pick, so the
+// renderer answers once with NO_PICK_JSON: a value that is not blank (the
+// Continue becomes available) and names no idea (the step after the gate never
+// reads it as a pick, so the run ends with that step's plain reason).
 //
 // The module is plain `.ts` written with `createElement`, and it imports nothing
 // but `react`, so the pack's own test runner loads it as it is.
@@ -30,6 +38,10 @@ const NOTHING_TO_PICK_READING =
   "No blog idea is on offer on this step, so there is nothing to pick here.";
 
 const WAITING_WORDS = "Awaiting your pick";
+
+/** What the step answers when no idea is on offer: not blank, and it names no
+ *  idea (no `artifactId`, no `representationRevisionId`), so it is never a pick. */
+export const NO_PICK_JSON = JSON.stringify({ noPick: true });
 
 /** The product radio item's classes, and those of its indicator icon. */
 const RADIO_ITEM_CLASSES =
@@ -106,6 +118,17 @@ export default function BlogIdeaSelectionRenderer(props: IdeaSelectionProps) {
   };
   const offered = offerableChoices(value.ideas);
   const reason = statedReason(value.reason);
+  // The empty offer's answer: written once after mount, only while the run waits
+  // on this step (never on a read-only replay, never while disabled).
+  const answersEmptyOffer =
+    offered.length === 0 && props.mode !== "view" && props.disabled !== true;
+  const onChange = props.onChange;
+  useEffect(() => {
+    if (!answersEmptyOffer) return;
+    void onChange({ selectedIdeaJson: NO_PICK_JSON, userResponse: NO_PICK_JSON });
+    // The answer is written when the step becomes an empty offer, not again on
+    // every new onChange identity the host hands down.
+  }, [answersEmptyOffer]);
   // The step's header, on every reading: ONE row with the question the pipeline
   // declared for this step (a blank or absent one draws no element) and, while
   // the run waits, the pill. A read-only replay (`mode="view"`) never waits.
