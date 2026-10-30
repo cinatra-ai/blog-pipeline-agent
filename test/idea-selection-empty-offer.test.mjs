@@ -23,7 +23,7 @@
  * - ideas on offer: no write before a pick, and a pick writes the reference of
  *   the chosen idea;
  * - a list that turns from empty to offering ideas (also through a reading with
- *   no list, and again after a pick and an empty list): the no-pick answer is
+ *   no list, and again from ideas through an empty list): the no-pick answer is
  *   withdrawn by one blank write in both keys before the first offered radios
  *   are painted (a probe reads the host's buffer when they first stand in the
  *   document), and a pick then writes its reference.

@@ -23,7 +23,9 @@ import { createElement, Fragment, useLayoutEffect, useRef, useState, type Keyboa
 // exactly "edit", and `disabled` absent or exactly false. With any other value
 // (a read-only replay, `mode="view"`, a locked step, or a value the contract
 // does not name) it writes nothing at all: no answer of its own, and a click or
-// a key on a radio picks nothing. While it writes:
+// a key on a radio picks nothing. It withdraws nothing on such a reading either:
+// an answer written earlier stands in the host's buffer, also when that reading
+// draws offered radios. While it writes:
 // - a list with an idea on offer: the value is the person's pick;
 // - a list that holds no idea that can be picked (no entry is an object that
 //   names both an artifact and a revision): there is nothing to pick, so the
@@ -149,7 +151,10 @@ export default function BlogIdeaSelectionRenderer(props: IdeaSelectionProps) {
   // when the list then offers an idea. A value it cannot read as a list gets no
   // answer: the renderer writes nothing of its own, and an answer written
   // earlier stands. Both are written in a layout effect, before the browser
-  // paints, so offered radios are never shown while a no-pick answer stands.
+  // paints, so while the renderer writes, offered radios are never drawn beside
+  // a no-pick answer of its own. On a reading where it writes nothing (view
+  // mode, a locked step) it withdraws nothing, so a no-pick answer written
+  // earlier stays beside the radios that reading draws.
   const answersEmptyOffer = writes && Array.isArray(value.ideas) && offered.length === 0;
   const withdrawsNoPick = writes && offered.length > 0;
   const noPickStands = useRef(false);
