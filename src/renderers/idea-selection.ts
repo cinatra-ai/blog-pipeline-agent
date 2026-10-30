@@ -23,10 +23,10 @@ import { createElement, Fragment, useEffect, useRef, useState, type KeyboardEven
 //   becomes available) and names no idea (the step after the gate never reads it
 //   as a pick, so the run ends with that step's plain reason);
 // - no list to read (no value, or `ideas` missing or not a list): the renderer
-//   writes nothing, so the Continue stays unavailable;
+//   writes nothing of its own; an answer written earlier stands;
 // - a list that turns from holding no idea to offering one after the renderer
-//   answered NO_PICK_JSON: the renderer withdraws that answer by writing a blank
-//   value, so the Continue waits for a pick again.
+//   answered NO_PICK_JSON, while it stays mounted: the renderer withdraws that
+//   answer by writing a blank value, so the Continue waits for a pick again.
 //
 // The module is plain `.ts` written with `createElement`, and it imports nothing
 // but `react`, so the pack's own test runner loads it as it is.
@@ -130,7 +130,8 @@ export default function BlogIdeaSelectionRenderer(props: IdeaSelectionProps) {
   // (never on a read-only replay, never while disabled): the no-pick answer when
   // the list it reads holds no idea that can be picked, and a blank value that
   // withdraws that answer when the list then offers an idea. A value it cannot
-  // read as a list is no answer: nothing is written, and the Continue stays held.
+  // read as a list gets no answer: the renderer writes nothing of its own, and an
+  // answer written earlier stands.
   const waitsHere = props.mode !== "view" && props.disabled !== true;
   const answersEmptyOffer = waitsHere && Array.isArray(value.ideas) && offered.length === 0;
   const withdrawsNoPick = waitsHere && offered.length > 0;
