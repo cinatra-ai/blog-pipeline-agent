@@ -498,7 +498,7 @@ test("a person offered nothing can still leave the gate, and the run ends with t
   const required = schema.required ?? [];
   assert.ok(
     !required.includes("selectedIdeaJson"),
-    "the pick is not required, so the empty list is a road out and not a dead end",
+    "the pick is not in the object-level required list (it is declared x-required on its property instead), so the empty list is a road out and not a dead end",
   );
   const out = parts.idea_selection_gate.outputs.find((o) => o.title === "selectedIdeaJson");
   assert.equal(out.default, "", "an unanswered pick leaves the gate as an empty pick");

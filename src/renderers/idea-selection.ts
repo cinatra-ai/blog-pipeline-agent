@@ -1,6 +1,6 @@
 "use client";
 
-import { createElement, Fragment, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { createElement, Fragment, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 
 // The idea step's own renderer (cinatra#3035). The one field-renderer binding
 // this pack declares names this module as its `component.entry`, so the runtime
@@ -14,19 +14,29 @@ import { createElement, Fragment, useEffect, useRef, useState, type KeyboardEven
 //
 // THE PICK IS DECLARED REQUIRED. The gate's schema marks `selectedIdeaJson`
 // `"x-required": true`, so the host keeps the step's Continue unavailable until
-// this renderer has written a value for it that is not blank. While the run
-// waits on the step (not on a read-only replay, not while disabled):
+// this renderer has written a value for it that is not blank.
+//
+// THE RENDERER WRITES ONLY WHILE THE RUN WAITS ON THE STEP, read as an
+// allow-list of the host's props (cinatra-ai/cinatra
+// packages/sdk-ui/src/field-renderer-props.ts: `mode` defaults to "edit" when
+// absent, `disabled` is true while the step is locked): `mode` absent or
+// exactly "edit", and `disabled` absent or exactly false. With any other value
+// (a read-only replay, `mode="view"`, a locked step, or a value the contract
+// does not name) it writes nothing at all: no answer of its own, and a click or
+// a key on a radio picks nothing. While it writes:
 // - a list with an idea on offer: the value is the person's pick;
-// - a list that holds no idea that can be picked (no entry names both an
-//   artifact and a revision): there is nothing to pick, so the renderer answers
-//   after mount with NO_PICK_JSON, a value that is not blank (the Continue
+// - a list that holds no idea that can be picked (no entry is an object that
+//   names both an artifact and a revision): there is nothing to pick, so the
+//   renderer answers with NO_PICK_JSON, a value that is not blank (the Continue
 //   becomes available) and names no idea (the step after the gate never reads it
-//   as a pick, so the run ends with that step's plain reason);
+//   as a pick, so the run ends with that step's plain reason). It answers once
+//   while that answer stands, before the browser paints;
 // - no list to read (no value, or `ideas` missing or not a list): the renderer
 //   writes nothing of its own; an answer written earlier stands;
 // - a list that turns from holding no idea to offering one after the renderer
 //   answered NO_PICK_JSON, while it stays mounted: the renderer withdraws that
-//   answer by writing a blank value, so the Continue waits for a pick again.
+//   answer by writing a blank value before the browser paints the offered
+//   radios, so the Continue waits for a pick again.
 //
 // The module is plain `.ts` written with `createElement`, and it imports nothing
 // but `react`, so the pack's own test runner loads it as it is.
@@ -69,10 +79,11 @@ type OfferedChoice = {
 /** The pair a pick is committed as. */
 type ChoiceReference = { artifactId: string; representationRevisionId: string };
 
-/** The reference an entry names, or null when it names none. */
-function choiceReference(choice: OfferedChoice): ChoiceReference | null {
-  const artifactId = choice.artifactId;
-  const representationRevisionId = choice.representationRevisionId;
+/** The reference an entry names, or null when it names none (also when the
+ *  entry is not an object: null, a number, a string, a list). */
+function choiceReference(choice: unknown): ChoiceReference | null {
+  if (choice === null || typeof choice !== "object" || Array.isArray(choice)) return null;
+  const { artifactId, representationRevisionId } = choice as OfferedChoice;
   if (typeof artifactId !== "string" || artifactId.length === 0) return null;
   if (typeof representationRevisionId !== "string" || representationRevisionId.length === 0) {
     return null;
@@ -80,10 +91,11 @@ function choiceReference(choice: OfferedChoice): ChoiceReference | null {
   return { artifactId, representationRevisionId };
 }
 
-/** Every entry of an offer that can actually be committed. */
+/** Every entry of an offer that can actually be committed; an entry that is
+ *  not an object naming both an artifact and a revision is not pickable. */
 function offerableChoices(value: unknown): OfferedChoice[] {
   if (!Array.isArray(value)) return [];
-  return (value as OfferedChoice[]).filter((choice) => choiceReference(choice) !== null);
+  return (value as unknown[]).filter((choice): choice is OfferedChoice => choiceReference(choice) !== null);
 }
 
 /** The entry's declared title, else a positional one so a row is never nameless. */
@@ -126,19 +138,24 @@ export default function BlogIdeaSelectionRenderer(props: IdeaSelectionProps) {
   };
   const offered = offerableChoices(value.ideas);
   const reason = statedReason(value.reason);
-  // What the renderer writes on its own, only while the run waits on this step
-  // (never on a read-only replay, never while disabled): the no-pick answer when
-  // the list it reads holds no idea that can be picked, and a blank value that
-  // withdraws that answer when the list then offers an idea. A value it cannot
-  // read as a list gets no answer: the renderer writes nothing of its own, and an
-  // answer written earlier stands.
-  const waitsHere = props.mode !== "view" && props.disabled !== true;
-  const answersEmptyOffer = waitsHere && Array.isArray(value.ideas) && offered.length === 0;
-  const withdrawsNoPick = waitsHere && offered.length > 0;
+  // The write gate is an allow-list: the renderer writes anything (its own
+  // answer or a person's pick) only while `mode` is absent or exactly "edit" and
+  // `disabled` is absent or exactly false.
+  const writes =
+    (props.mode === undefined || props.mode === "edit") &&
+    (props.disabled === undefined || props.disabled === false);
+  // Its own answers: the no-pick value when the list it reads holds no idea that
+  // can be picked (once while it stands), and a blank value that withdraws it
+  // when the list then offers an idea. A value it cannot read as a list gets no
+  // answer: the renderer writes nothing of its own, and an answer written
+  // earlier stands. Both are written in a layout effect, before the browser
+  // paints, so offered radios are never shown while a no-pick answer stands.
+  const answersEmptyOffer = writes && Array.isArray(value.ideas) && offered.length === 0;
+  const withdrawsNoPick = writes && offered.length > 0;
   const noPickStands = useRef(false);
   const onChange = props.onChange;
-  useEffect(() => {
-    if (answersEmptyOffer) {
+  useLayoutEffect(() => {
+    if (answersEmptyOffer && !noPickStands.current) {
       noPickStands.current = true;
       void onChange({ selectedIdeaJson: NO_PICK_JSON, userResponse: NO_PICK_JSON });
     } else if (withdrawsNoPick && noPickStands.current) {
@@ -215,6 +232,7 @@ export default function BlogIdeaSelectionRenderer(props: IdeaSelectionProps) {
       ideas: offered,
       onChange: props.onChange,
       disabled: props.disabled,
+      writes,
     }),
   );
 }
@@ -288,23 +306,26 @@ export function ideaKeyMove(
 /**
  * Radio-per-idea chooser. Commits `JSON.stringify({artifactId,
  * representationRevisionId})` into { selectedIdeaJson, userResponse } — and only
- * ever in response to a person choosing.
+ * ever in response to a person choosing, and only while `writes` (the
+ * renderer's allow-list) holds. `disabled` draws the locked look as before.
  */
 function IdeaChooser({
   ideas,
   onChange,
   disabled,
+  writes,
 }: {
   ideas: OfferedChoice[];
   onChange: (next: unknown) => unknown;
   disabled?: boolean;
+  writes: boolean;
 }) {
   // Nothing is chosen until someone chooses. The choice is the reference it
   // committed, so it stays with its idea when the offered ideas change.
   const [chosenJson, setChosenJson] = useState<string | null>(null);
   const selectedIndex = chosenIdeaIndex(ideas, chosenJson);
   const choose = (idx: number) => {
-    if (disabled || idx === selectedIndex) return;
+    if (!writes || disabled || idx === selectedIndex) return;
     const reference = choiceReference(ideas[idx]);
     if (!reference) return;
     const json = JSON.stringify(reference);
@@ -316,7 +337,7 @@ function IdeaChooser({
   // radio of that idea inside the same radio group.
   const tabbableIndex = tabbableIdeaIndex(selectedIndex, ideas.length);
   const moveFrom = (idx: number, event: KeyboardEvent<HTMLButtonElement>) => {
-    const target = ideaKeyMove(idx, ideas.length, event.key, disabled === true);
+    const target = ideaKeyMove(idx, ideas.length, event.key, !writes || disabled === true);
     if (target === null) return;
     event.preventDefault();
     choose(target);
