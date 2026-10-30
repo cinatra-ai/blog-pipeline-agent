@@ -1440,11 +1440,12 @@
             "properties": {
               "selectedIdeaJson": {
                 "type": "string",
-                "title": "Selected idea (JSON)"
+                "title": "Selected idea (JSON)",
+                "x-required": true
               }
             }
           },
-          "description": "The stored-ideas gate of plan (C) section 5.1. The list is the organisation's own unused blog ideas, read by the preparation step in front of this gate: a person picks exactly one and nothing is picked for them. The pick commits the idea's artifact and the exact revision the list offered, as one JSON string (an InputMessageNode emits one string output), never a title and never free text. With no idea left the list arrives empty with the reason the run ends on, and the reason is what the person reads; the pick is not a required field, so a person who reads that sentence can continue and the run ends at the step after this one with that same plain reason, instead of parking at a pause nothing can answer. Continuing without a pick ends the run the same way: nothing is ever picked for them. The brief and the idea count travel with the list for the road that asks for new ideas."
+          "description": "The stored-ideas gate of plan (C) section 5.1. The list is the organisation's own unused blog ideas, read by the preparation step in front of this gate: a person picks exactly one and nothing is picked for them. The pick commits the idea's artifact and the exact revision the list offered, as one JSON string (an InputMessageNode emits one string output), never a title and never free text. The pick is declared \"x-required\": true, so while ideas are offered the host keeps the step's Continue unavailable until a person picks one. With no idea left the list arrives empty with the reason the run ends on, and the reason is what the person reads; the step's renderer then answers the pick with the no-pick value {\"noPick\":true}, which names no idea, so a person who reads that sentence can continue and the run ends at the step after this one with a plain reason and nothing reserved, instead of parking at a pause nothing can answer. A pick that names no offered idea ends the run the same way: nothing is ever picked for them. The brief and the idea count travel with the list for the road that asks for new ideas."
         }
       },
       "outputs": [

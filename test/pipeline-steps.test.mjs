@@ -488,14 +488,17 @@ test("the pipeline declares the idea-to-draft relation table it writes", () => {
 
 test("a person offered nothing can still leave the gate, and the run ends with the plain reason", () => {
   // "An empty list ends the run with a plain reason" (6.1 step 2). The reason is
-  // drawn at the gate; if the pick were a REQUIRED field the person could read
-  // that sentence and never act on it — the run would park at a pause nothing
-  // can answer, which is not an ending.
+  // drawn at the gate; if the pick were in the schema's REQUIRED list the person
+  // could read that sentence and never act on it — the run would park at a pause
+  // nothing can answer, which is not an ending. The pick is declared
+  // "x-required" instead, a value the step's renderer must write: with no idea on
+  // offer the renderer writes its no-pick value (test/idea-pick-required.test.mjs,
+  // test/idea-selection-empty-offer.test.mjs).
   const schema = parts.idea_selection_gate.metadata.cinatra.inputMessageSchema;
   const required = schema.required ?? [];
   assert.ok(
     !required.includes("selectedIdeaJson"),
-    "the pick is not required, so the empty list is a road out and not a dead end",
+    "the pick is not in the object-level required list (it is declared x-required on its property instead), so the empty list is a road out and not a dead end",
   );
   const out = parts.idea_selection_gate.outputs.find((o) => o.title === "selectedIdeaJson");
   assert.equal(out.default, "", "an unanswered pick leaves the gate as an empty pick");
