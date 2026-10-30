@@ -10,7 +10,9 @@
  * With no idea on offer the renderer answers the pick with its no-pick value. The
  * step after the gate (the reserve operation of the stored-ideas tool) must never
  * read that value as a pick: it returns a reason and writes no reservation, both
- * for the empty list and for a list that holds ideas.
+ * for the empty list and for a list that holds ideas. The same holds for the
+ * pure decision module the pack's own runner uses (`resolveIdeaPick` in
+ * src/lib/blog/stored-ideas-gate.ts).
  *
  *   node --test test/idea-pick-required.test.mjs
  */
@@ -19,6 +21,7 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { extensionTool } from "../cinatra/tools/stored-ideas.mjs";
+import { resolveIdeaPick } from "../src/lib/blog/stored-ideas-gate.ts";
 
 const OAS = JSON.parse(readFileSync(new URL("../cinatra/oas.json", import.meta.url), "utf8"));
 const GATE = OAS.$referenced_components.idea_selection_gate;
@@ -110,6 +113,21 @@ describe("the no-pick value at the reserve step", () => {
       assert.ok(!("claimId" in result), "nothing was reserved");
       assert.ok(!("idea" in result), "no idea was handed on");
       assert.deepEqual(calls, [], "no row was read or written");
+    });
+  }
+});
+
+describe("the no-pick value at the pack's own decision module", () => {
+  for (const [name, offered] of [
+    ["an empty offered list", []],
+    ["an offered list that holds an idea", OFFERED],
+  ]) {
+    it(`resolveIdeaPick, with ${name}, refuses it with a reason`, async () => {
+      const outcome = resolveIdeaPick({ pick: await noPickValue(), offered });
+      assert.equal(outcome.ok, false, "the no-pick value is never a pick");
+      assert.ok(!("idea" in outcome), "no idea is resolved");
+      assert.equal(typeof outcome.reason, "string");
+      assert.notEqual(outcome.reason.trim(), "", "the run ends with a plain reason");
     });
   }
 });

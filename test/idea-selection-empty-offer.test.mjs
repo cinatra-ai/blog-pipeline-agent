@@ -8,11 +8,20 @@
  *
  * - an empty offer, while the run waits: exactly one write, the no-pick value
  *   `{"noPick":true}` in both `selectedIdeaJson` and `userResponse`, and no
- *   second write on a re-render;
- * - an empty offer on a read-only replay (`mode="view"`) or while disabled: no
- *   write at all;
+ *   second write on a re-render or when the host hands down a new `onChange`;
+ *   under React's StrictMode every write is that value;
+ * - a list whose entries all lack a reference (nothing can be picked): the same
+ *   one no-pick write;
+ * - an empty offer on a read-only replay (`mode="view"`), while disabled, or
+ *   both: no write at all;
+ * - no list to read (no value, `ideas` missing, `ideas` not a list): no write,
+ *   so the host keeps the Continue held, also when a list with ideas arrives
+ *   after it;
  * - ideas on offer: no write before a pick, and a pick writes the reference of
- *   the chosen idea.
+ *   the chosen idea;
+ * - a list that turns from empty to offering ideas: the no-pick answer is
+ *   withdrawn by one blank write in both keys, and a pick then writes its
+ *   reference.
  *
  *   node --test test/idea-selection-empty-offer.test.mjs
  */
@@ -65,14 +74,24 @@ after(() => {
   dom?.window.close();
 });
 
-/** Mount one reading; returns the recorded writes, the container and the root. */
-async function mount(props) {
+const BLANK = { selectedIdeaJson: "", userResponse: "" };
+const NO_PICK_WRITE = { selectedIdeaJson: NO_PICK, userResponse: NO_PICK };
+
+/** Mount one reading; returns the recorded writes, the container and the root.
+ *  A reading that names its own `onChange` is drawn with it (and records
+ *  nothing here); `strict` draws the renderer inside React's StrictMode. */
+async function mount(props, { strict = false } = {}) {
   const calls = [];
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-  const draw = (next) =>
-    React.createElement(Renderer, { ...next, onChange: (value) => void calls.push(value) });
+  const draw = (next) => {
+    const element = React.createElement(Renderer, {
+      onChange: (value) => void calls.push(value),
+      ...next,
+    });
+    return strict ? React.createElement(React.StrictMode, null, element) : element;
+  };
   await act(async () => {
     root.render(draw(props));
   });
@@ -139,6 +158,106 @@ describe("the idea step, mounted", () => {
         representationRevisionId: IDEAS[1].representationRevisionId,
       });
       assert.deepEqual(view.calls, [{ selectedIdeaJson: reference, userResponse: reference }]);
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("a new onChange identity from the host is not answered again", async () => {
+    const first = [];
+    const second = [];
+    const view = await mount({ value: { ideas: [] }, onChange: (value) => void first.push(value) });
+    try {
+      await view.rerender({ value: { ideas: [] }, onChange: (value) => void second.push(value) });
+      assert.deepEqual(first, [NO_PICK_WRITE], "the first onChange got the one answer");
+      assert.deepEqual(second, [], "the second onChange got nothing");
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("under StrictMode every write of an empty offer is the no-pick value", async () => {
+    const view = await mount({ value: { ideas: [] } }, { strict: true });
+    try {
+      assert.ok(view.calls.length >= 1, "the empty offer is answered");
+      for (const call of view.calls) assert.deepEqual(call, NO_PICK_WRITE);
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("a list whose entries all lack a reference is answered with the no-pick value once", async () => {
+    const view = await mount({
+      value: {
+        ideas: [
+          { artifactId: "idea-artifact-only", title: "No revision" },
+          { representationRevisionId: "idea-revision-only", title: "No artifact" },
+          { artifactId: "", representationRevisionId: "idea-revision-blank", title: "Blank artifact" },
+          "not an entry",
+        ],
+      },
+    });
+    try {
+      assert.deepEqual(view.calls, [NO_PICK_WRITE]);
+      assert.equal(view.container.querySelectorAll('[role="radio"]').length, 0, "no radio to pick");
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("an empty offer on a read-only replay that is also disabled writes nothing", async () => {
+    const view = await mount({ value: { ideas: [] }, mode: "view", disabled: true });
+    try {
+      assert.deepEqual(view.calls, []);
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  for (const [name, props] of [
+    ["no value", {}],
+    ["a value without ideas", { value: { reason: "Some reason." } }],
+    ["ideas that are not a list", { value: { ideas: { artifactId: "idea-artifact-first" } } }],
+    ["ideas given as a JSON string", { value: { ideas: "[]" } }],
+  ]) {
+    it(`${name}: nothing is written, so the Continue stays held`, async () => {
+      const view = await mount(props);
+      try {
+        assert.deepEqual(view.calls, []);
+      } finally {
+        await view.unmount();
+      }
+    });
+  }
+
+  it("no list to read, then a list with ideas: nothing is written before a pick", async () => {
+    const view = await mount({});
+    try {
+      await view.rerender({ value: { ideas: IDEAS } });
+      assert.deepEqual(view.calls, [], "nothing is picked for anyone");
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it("an empty list that turns to offering ideas withdraws the no-pick answer, and a pick then writes", async () => {
+    const view = await mount({ value: { ideas: [] } });
+    try {
+      assert.deepEqual(view.calls, [NO_PICK_WRITE]);
+      await view.rerender({ value: { ideas: IDEAS } });
+      assert.deepEqual(view.calls, [NO_PICK_WRITE, BLANK], "one blank write withdraws the answer");
+      await view.rerender({ value: { ideas: IDEAS } });
+      assert.equal(view.calls.length, 2, "a re-render writes nothing more");
+      const radios = view.container.querySelectorAll('[role="radio"]');
+      await act(async () => {
+        radios[0].dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+      });
+      const reference = JSON.stringify({
+        artifactId: IDEAS[0].artifactId,
+        representationRevisionId: IDEAS[0].representationRevisionId,
+      });
+      assert.deepEqual(view.calls[2], { selectedIdeaJson: reference, userResponse: reference });
+      assert.equal(view.calls.length, 3);
     } finally {
       await view.unmount();
     }

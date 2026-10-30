@@ -1,24 +1,32 @@
 "use client";
 
-import { createElement, Fragment, useEffect, useState, type KeyboardEvent } from "react";
+import { createElement, Fragment, useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 // The idea step's own renderer (cinatra#3035). The one field-renderer binding
 // this pack declares names this module as its `component.entry`, so the runtime
 // mounts it for the stored-ideas gate and hands it the binding's declared params.
 //
 // PAYLOAD CONTRACT. The gate is an input-message step whose one string output
-// (`selectedIdeaJson`) becomes the resume text (`userResponse`); a pick is
-// committed as JSON into BOTH keys. NOTHING IS PICKED FOR ANYONE: the list starts
-// with no selection and commits only what a person actually chooses, and what it
-// commits is the REFERENCE the offer named, never a title.
+// (`selectedIdeaJson`) becomes the resume text (`userResponse`); every value this
+// renderer writes goes into BOTH keys. NOTHING IS PICKED FOR ANYONE: the list
+// starts with no selection, and the only value that names an idea is a person's
+// pick, which commits the REFERENCE the offer named, never a title.
 //
 // THE PICK IS DECLARED REQUIRED. The gate's schema marks `selectedIdeaJson`
 // `"x-required": true`, so the host keeps the step's Continue unavailable until
-// this renderer has written a value for it. With ideas on offer that value is
-// the person's pick. With no idea on offer there is nothing to pick, so the
-// renderer answers once with NO_PICK_JSON: a value that is not blank (the
-// Continue becomes available) and names no idea (the step after the gate never
-// reads it as a pick, so the run ends with that step's plain reason).
+// this renderer has written a value for it that is not blank. While the run
+// waits on the step (not on a read-only replay, not while disabled):
+// - a list with an idea on offer: the value is the person's pick;
+// - a list that holds no idea that can be picked (no entry names both an
+//   artifact and a revision): there is nothing to pick, so the renderer answers
+//   after mount with NO_PICK_JSON, a value that is not blank (the Continue
+//   becomes available) and names no idea (the step after the gate never reads it
+//   as a pick, so the run ends with that step's plain reason);
+// - no list to read (no value, or `ideas` missing or not a list): the renderer
+//   writes nothing, so the Continue stays unavailable;
+// - a list that turns from holding no idea to offering one after the renderer
+//   answered NO_PICK_JSON: the renderer withdraws that answer by writing a blank
+//   value, so the Continue waits for a pick again.
 //
 // The module is plain `.ts` written with `createElement`, and it imports nothing
 // but `react`, so the pack's own test runner loads it as it is.
@@ -118,17 +126,27 @@ export default function BlogIdeaSelectionRenderer(props: IdeaSelectionProps) {
   };
   const offered = offerableChoices(value.ideas);
   const reason = statedReason(value.reason);
-  // The empty offer's answer: written once after mount, only while the run waits
-  // on this step (never on a read-only replay, never while disabled).
-  const answersEmptyOffer =
-    offered.length === 0 && props.mode !== "view" && props.disabled !== true;
+  // What the renderer writes on its own, only while the run waits on this step
+  // (never on a read-only replay, never while disabled): the no-pick answer when
+  // the list it reads holds no idea that can be picked, and a blank value that
+  // withdraws that answer when the list then offers an idea. A value it cannot
+  // read as a list is no answer: nothing is written, and the Continue stays held.
+  const waitsHere = props.mode !== "view" && props.disabled !== true;
+  const answersEmptyOffer = waitsHere && Array.isArray(value.ideas) && offered.length === 0;
+  const withdrawsNoPick = waitsHere && offered.length > 0;
+  const noPickStands = useRef(false);
   const onChange = props.onChange;
   useEffect(() => {
-    if (!answersEmptyOffer) return;
-    void onChange({ selectedIdeaJson: NO_PICK_JSON, userResponse: NO_PICK_JSON });
-    // The answer is written when the step becomes an empty offer, not again on
-    // every new onChange identity the host hands down.
-  }, [answersEmptyOffer]);
+    if (answersEmptyOffer) {
+      noPickStands.current = true;
+      void onChange({ selectedIdeaJson: NO_PICK_JSON, userResponse: NO_PICK_JSON });
+    } else if (withdrawsNoPick && noPickStands.current) {
+      noPickStands.current = false;
+      void onChange({ selectedIdeaJson: "", userResponse: "" });
+    }
+    // Written when the step's reading changes, not again on every new onChange
+    // identity the host hands down.
+  }, [answersEmptyOffer, withdrawsNoPick]);
   // The step's header, on every reading: ONE row with the question the pipeline
   // declared for this step (a blank or absent one draws no element) and, while
   // the run waits, the pill. A read-only replay (`mode="view"`) never waits.
