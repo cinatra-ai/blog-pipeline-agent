@@ -4,9 +4,9 @@ Turns one blog idea your organisation already holds into a finished post with it
 
 **Install:** find Blog Pipeline Agent in the marketplace and add it to your workspace. No credentials are required; the agent uses the Cinatra platform to call its child agents.
 
-**Configuration:** pass a `brief` (required) plus optional `audience`, `tone` (default: informative), `length` (default: medium), `referenceContent` and `ideaCount` (default: 5). `companyUrl`, `blogPostUrl`, `projectId` and `cinatra_run_id` are set by the platform and are not shown.
+**Configuration:** pass a `brief` (required) plus optional `audience`, `tone` (default: informative), `length` (default: medium), `referenceContent` and `ideaCount` (default: 5). `companyUrl`, `blogPostUrl`, `projectId`, `cinatra_run_id`, `draftNote` and `imagePrompt` are set by the platform and are not shown.
 
-**API contract:** inputs — `brief` (required), `audience`, `tone`, `length`, `referenceContent`, `ideaCount`, `companyUrl`, `blogPostUrl`, `projectId`, `cinatra_run_id`; outputs — `linkedinPost`, `linkedinTitle`. The post is written during the run as an artifact of its own, not a run output.
+**API contract:** inputs — `brief` (required), `audience`, `tone`, `length`, `referenceContent`, `ideaCount`, `companyUrl`, `blogPostUrl`, `projectId`, `cinatra_run_id`, `draftNote`, `imagePrompt`; outputs — `linkedinPost`, `linkedinTitle`. The post is written mid-run as an artifact of its own, not a run output.
 
 **Development:** run `node extension-kind-gate.mjs`, `node renderer-binding-gate.mjs` and `npm test` before publishing.
 
