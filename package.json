@@ -141,6 +141,20 @@
     "hasApprovalGates": true,
     "toolAccess": [],
     "ownerOrgId": null,
+    "lifecycle": {
+      "regenerate": [
+        {
+          "artifactNode": "write_draft",
+          "step": "draft_flow",
+          "noteInput": "note"
+        },
+        {
+          "artifactNode": "file_image",
+          "step": "image_flow",
+          "noteInput": "prompt"
+        }
+      ]
+    },
     "consumes": [],
     "produces": [
       {
