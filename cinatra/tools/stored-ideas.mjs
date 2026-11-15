@@ -113,6 +113,19 @@ function titleFromIdeaText(value) {
   return firstLine.replace(/^title\s*:\s*/i, "").trim();
 }
 
+/** The idea's words below its title line, as the row's detail. */
+function bodyBelowTitle(value) {
+  return text(value).split(/\r?\n/).slice(1).join("\n").trim();
+}
+
+/** The row title the product draws: the idea's own title, else its position in
+ *  the offer ("Idea 2"), so an idea whose text cannot be read is still a row a
+ *  person can pick and never reads as an empty list. The idea's `title` and
+ *  `text` stay as they are; the label is for the row only. */
+function offerLabel(title, position) {
+  return title === "" ? `Idea ${position}` : title;
+}
+
 /** The active claim for one candidate, across this organisation's runs.
  * Released history has a NULL key, so it cannot exhaust this read's window.
  * UNIQUE(org_id, active_idea_key) makes the targeted equality match at most one
@@ -205,8 +218,8 @@ function artifactReferences(page) {
 }
 
 /** One idea's text. Null when the content cannot be read — a candidate with no
- *  readable text is still an idea, offered under an empty title rather than
- *  dropped, because dropping it would silently shrink the list. */
+ *  readable text is still an idea, offered under its position as the row title
+ *  rather than dropped, because dropping it would silently shrink the list. */
 async function readIdeaText(ports, reference) {
   try {
     const read = await ports.artifacts.contentRead({
@@ -224,8 +237,8 @@ async function readIdeaText(ports, reference) {
 /**
  * The list the gate offers. The list is read page by page, with the mark each
  * page returns for the next one, until the offer is full, the list has ended or
- * the page bound is reached. An empty list ends the run with the sentence it
- * carries, never with a pick nobody made.
+ * the page bound is reached. An empty list comes back with the sentence the
+ * step shows while the run waits there, never with a pick nobody made.
  */
 async function prepare(input, ports) {
   const ideaType = requireIdeaType(input);
@@ -253,7 +266,14 @@ async function prepare(input, ports) {
       if (takenArtifactIds(live).includes(reference.artifactId)) continue;
       const read = await readIdeaText(ports, reference);
       const body = read ?? "";
-      ideas.push({ ...reference, text: body, title: titleFromIdeaText(body) });
+      const title = titleFromIdeaText(body);
+      ideas.push({
+        ...reference,
+        text: body,
+        title,
+        label: offerLabel(title, ideas.length + 1),
+        body: bodyBelowTitle(body),
+      });
     }
     if (ideas.length >= MAX_OFFERED_IDEAS) break;
     // A page may come back short, even empty, with a mark for the next one, so

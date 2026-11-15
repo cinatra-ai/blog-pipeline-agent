@@ -1,5 +1,5 @@
 /**
- * THE IDEA STEP'S PICK IS DECLARED REQUIRED, AND THE EMPTY LIST STILL HAS A ROAD OUT.
+ * THE IDEA STEP'S PICK IS DECLARED REQUIRED, AND A VALUE THAT NAMES NO IDEA IS REFUSED.
  *
  * The host keeps a mid-run gate's Continue unavailable while a property that the
  * gate's `inputMessageSchema` marks `"x-required": true` has no value from the

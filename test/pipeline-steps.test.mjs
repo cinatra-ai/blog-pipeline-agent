@@ -486,7 +486,7 @@ test("the pipeline declares the idea-to-draft relation table it writes", () => {
 //    the shape the review core parses.
 // ---------------------------------------------------------------------------
 
-test("a person offered nothing can still leave the gate, and the run ends with the plain reason", () => {
+test("a person offered nothing reads the plain reason, and an unanswered pick is refused after the gate", () => {
   // "An empty list ends the run with a plain reason" (6.1 step 2). The reason is
   // drawn at the gate; if the pick were in the schema's REQUIRED list the person
   // could read that sentence and never act on it — the run would park at a pause
@@ -499,7 +499,7 @@ test("a person offered nothing can still leave the gate, and the run ends with t
   const required = schema.required ?? [];
   assert.ok(
     !required.includes("selectedIdeaJson"),
-    "the pick is not in the object-level required list (it is declared x-required on its property instead), so the empty list is a road out and not a dead end",
+    "the pick is not in the object-level required list (it is declared x-required on its property instead), so the host's list step, not the schema, holds the Continue",
   );
   const out = parts.idea_selection_gate.outputs.find((o) => o.title === "selectedIdeaJson");
   assert.equal(out.default, "", "an unanswered pick leaves the gate as an empty pick");

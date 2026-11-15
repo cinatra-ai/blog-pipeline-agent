@@ -95,8 +95,16 @@ export interface OfferedIdea extends StoredIdeaCandidate {
   readonly title: string;
 }
 
+/** An offered idea as the product's list step draws it: the row title (the
+ *  idea's title, else its position in the offer) and the words below the title.
+ *  The idea's own `title` and `text` stay as they are. */
+export interface OfferedIdeaRow extends OfferedIdea {
+  readonly label: string;
+  readonly body: string;
+}
+
 export type StoredIdeaOffer =
-  | { readonly ok: true; readonly ideas: OfferedIdea[] }
+  | { readonly ok: true; readonly ideas: OfferedIdeaRow[] }
   /** The run ends here, with this sentence — never with a pick nobody made. */
   | { readonly ok: false; readonly reason: string };
 
@@ -186,22 +194,28 @@ export function titleFromIdeaText(text: string): string {
  * The ideas still on offer: every candidate whose artifact no live relation row
  * names.
  *
- * A candidate with no readable text is still an idea — it is offered under an
- * empty title rather than dropped, because dropping it would silently shrink a
- * list a person is choosing from.
+ * A candidate with no readable text is still an idea — it is offered under its
+ * position as the row title ("Idea 2") rather than dropped, because dropping it
+ * would silently shrink a list a person is choosing from.
  */
 export function offerStoredIdeas(input: {
   readonly candidates: readonly StoredIdeaCandidate[];
   readonly takenArtifactIds: readonly string[];
 }): StoredIdeaOffer {
   const taken = new Set(input.takenArtifactIds);
-  const ideas: OfferedIdea[] = [];
+  const ideas: OfferedIdeaRow[] = [];
   const seen = new Set<string>();
   for (const candidate of input.candidates) {
     if (taken.has(candidate.artifactId)) continue;
     if (seen.has(candidate.artifactId)) continue;
     seen.add(candidate.artifactId);
-    ideas.push({ ...candidate, title: titleFromIdeaText(candidate.text) });
+    const title = titleFromIdeaText(candidate.text);
+    ideas.push({
+      ...candidate,
+      title,
+      label: title === "" ? `Idea ${ideas.length + 1}` : title,
+      body: (candidate.text ?? "").split(/\r?\n/).slice(1).join("\n").trim(),
+    });
   }
   if (ideas.length === 0) return { ok: false, reason: EMPTY_LIST_REASON };
   return { ok: true, ideas };

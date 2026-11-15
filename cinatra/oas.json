@@ -1454,7 +1454,7 @@
           "riskClass": "read_only",
           "requiresApproval": false,
           "packageName": "@cinatra-ai/blog-pipeline-agent",
-          "description": "The preparation step of plan (C) section 5.1: it lists every blog idea the organisation holds through the dependency this extension declares, reads each unused one, subtracts the ideas a draft already used or another run reserved, and hands the rest to the gate as the list a person chooses from. An empty list comes back with the sentence the run ends on, never with a pick."
+          "description": "The preparation step of plan (C) section 5.1: it lists every blog idea the organisation holds through the dependency this extension declares, reads each unused one, subtracts the ideas a draft already used or another run reserved, and hands the rest to the gate as the list a person chooses from. Each offered idea carries its row title (the idea's title, else its position in the list, so an idea whose text cannot be read is still offered) and the words below the title. An empty list comes back with the sentence the step shows while the run waits there, never with a pick."
         }
       }
     },
