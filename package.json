@@ -1,26 +1,12 @@
 {
   "name": "@cinatra-ai/blog-pipeline-agent",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "license": "Apache-2.0",
   "description": "Parent orchestrator (WayFlow Flow OAS) that turns one stored blog idea into a reviewed blog post, its featured image and the LinkedIn post that announces it. Manual brief / reference artifacts input only; transcript input is not accepted. projectId threaded across children. Four HITL pauses of its own: the brand-voice pick handed down to the writing and image steps, then the stored-ideas gate, the review the run parks at, and the LinkedIn post; the review DECISION is core's (artifact-lifecycle interception), this flow declares the pause and names the run's own revisions as its targets.",
   "type": "module",
   "files": [
     "cinatra"
   ],
-  "peerDependencies": {
-    "react": "^19.0.0"
-  },
-  "peerDependenciesMeta": {
-    "react": {
-      "optional": true
-    }
-  },
-  "devDependencies": {
-    "@types/react": "^19.2.17",
-    "jsdom": "26.1.0",
-    "react": "19.2.7",
-    "react-dom": "19.2.7"
-  },
   "cinatra": {
     "apiVersion": "cinatra.ai/v1",
     "kind": "agent",
@@ -133,13 +119,15 @@
         "kind": "blog-idea-selection",
         "priority": 80,
         "midRunHitl": true,
-        "params": {
+        "screen": {
+          "layout": "list",
           "question": "Which stored blog idea should this run draft?",
+          "items": "ideas",
+          "title": "text",
+          "detail": "text",
+          "pickKeys": ["artifactId", "representationRevisionId"],
+          "answerKeys": ["selectedIdeaJson", "userResponse"],
           "emptyStateMessage": "There is no blog idea left to draft: every stored idea already has a draft or is reserved by another run. This list was read when the run reached this step, and it does not change while the run waits here. Generate new ideas; the next run of this pipeline offers them."
-        },
-        "component": {
-          "entry": "./src/renderers/idea-selection.ts",
-          "propsApiVersion": 1
         }
       }
     ],

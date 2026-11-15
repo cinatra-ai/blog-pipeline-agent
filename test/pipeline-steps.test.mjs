@@ -491,9 +491,10 @@ test("a person offered nothing can still leave the gate, and the run ends with t
   // drawn at the gate; if the pick were in the schema's REQUIRED list the person
   // could read that sentence and never act on it — the run would park at a pause
   // nothing can answer, which is not an ending. The pick is declared
-  // "x-required" instead, a value the step's renderer must write: with no idea on
-  // offer the renderer writes its no-pick value (test/idea-pick-required.test.mjs,
-  // test/idea-selection-empty-offer.test.mjs).
+  // "x-required" instead, a value the step must receive before its Continue sends.
+  // With no idea on offer the product's list step keeps that Continue unavailable
+  // and the run waits; a value that names no idea is refused at the step after the
+  // gate (test/idea-pick-required.test.mjs, test/idea-step-declared-screen-3470.test.mjs).
   const schema = parts.idea_selection_gate.metadata.cinatra.inputMessageSchema;
   const required = schema.required ?? [];
   assert.ok(
