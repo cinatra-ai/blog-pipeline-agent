@@ -2,8 +2,8 @@
  * THE IDEA STEP'S DECLARED WORDS.
  *
  * The host draws the stored-ideas step from what this pack declares on its one
- * field-renderer binding: the question the step asks, and the message it shows
- * when the declared list is empty. The run waits at that step, so the message
+ * field-renderer binding, in the binding's declared list screen: the question
+ * the step asks, and the message it shows when the declared list is empty. The run waits at that step, so the message
  * never sends the reader away to start the pipeline again, and the list is read
  * once when the run reaches the step, so the message never promises a new list
  * on reopening it. The sentence the gate returns for an empty offer is the
@@ -18,7 +18,7 @@ import { describe, it } from "node:test";
 import { offerStoredIdeas } from "../src/lib/blog/stored-ideas-gate.ts";
 
 const BINDING_ID = "@cinatra-ai/blog-pipeline-agent:idea-selection";
-const MAX_PARAMS_JSON_BYTES = 2048;
+const MAX_TEXT = 600;
 
 const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 
@@ -39,25 +39,23 @@ function isPlainObject(value) {
 }
 
 describe("the idea step's declared words", () => {
-  it("the one binding carries a question and an empty-state message as plain JSON", () => {
+  it("the one binding's screen carries a question and an empty-state message as plain text", () => {
     const binding = theBinding();
-    const params = binding.params;
-    assert.ok(isPlainObject(params), "params is a plain object");
-    assert.deepEqual(Object.keys(params).sort(), ["emptyStateMessage", "question"]);
+    const screen = binding.screen;
+    assert.ok(isPlainObject(screen), "the binding declares a screen as a plain object");
     for (const key of ["question", "emptyStateMessage"]) {
-      assert.equal(typeof params[key], "string", `${key} is a string`);
-      assert.notEqual(params[key].trim(), "", `${key} is not blank`);
+      assert.equal(typeof screen[key], "string", `${key} is a string`);
+      assert.notEqual(screen[key].trim(), "", `${key} is not blank`);
+      assert.ok(screen[key].length <= MAX_TEXT, `${key} is at most ${MAX_TEXT} characters`);
     }
-    const serialized = JSON.stringify(params);
     assert.ok(
-      Buffer.byteLength(serialized, "utf8") <= MAX_PARAMS_JSON_BYTES,
-      "params serialize to 2048 bytes or less",
+      !Object.prototype.hasOwnProperty.call(binding, "params"),
+      "the words live in the screen only, never in a second copy under params",
     );
-    assert.equal(JSON.stringify(JSON.parse(serialized)), serialized, "params round-trip as plain JSON");
   });
 
   it("the sentence an empty offer returns is the declared message, word for word", () => {
-    const declared = theBinding().params?.emptyStateMessage;
+    const declared = theBinding().screen?.emptyStateMessage;
     const offer = offerStoredIdeas({ candidates: [], takenArtifactIds: [] });
     assert.equal(offer.ok, false);
     if (offer.ok) return;
@@ -65,7 +63,7 @@ describe("the idea step's declared words", () => {
   });
 
   it("the message never sends the reader away from a run that waits, and never promises a new list", () => {
-    const declared = theBinding().params?.emptyStateMessage;
+    const declared = theBinding().screen?.emptyStateMessage;
     const offer = offerStoredIdeas({ candidates: [], takenArtifactIds: [] });
     assert.equal(offer.ok, false);
     if (offer.ok) return;

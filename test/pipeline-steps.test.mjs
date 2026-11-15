@@ -154,7 +154,7 @@ test("the gate offers that list, not a free-text field and not an in-run batch",
   const gate = parts.idea_selection_gate;
   const declared = (gate.inputs ?? []).map((i) => i.title);
   assert.ok(declared.includes("ideas"), "the gate declares the offered ideas as a render input");
-  assert.ok(declared.includes("reason"), "and the sentence an empty list ends the run with");
+  assert.ok(declared.includes("reason"), "and the sentence the step shows on an empty list");
   for (const name of ["ideas", "reason"]) {
     const edge = edgeInto("idea_selection_gate", name);
     assert.ok(edge, `${name} must be edge-sourced into the gate`);
@@ -486,19 +486,21 @@ test("the pipeline declares the idea-to-draft relation table it writes", () => {
 //    the shape the review core parses.
 // ---------------------------------------------------------------------------
 
-test("a person offered nothing can still leave the gate, and the run ends with the plain reason", () => {
-  // "An empty list ends the run with a plain reason" (6.1 step 2). The reason is
-  // drawn at the gate; if the pick were in the schema's REQUIRED list the person
+test("a person offered nothing reads the plain reason, and an unanswered pick is refused after the gate", () => {
+  // "An empty list ends the run with a plain reason" (6.1 step 2); the product's
+  // list step now keeps the run waiting at the gate with that reason drawn. The
+  // reason is drawn at the gate; if the pick were in the schema's REQUIRED list the person
   // could read that sentence and never act on it — the run would park at a pause
   // nothing can answer, which is not an ending. The pick is declared
-  // "x-required" instead, a value the step's renderer must write: with no idea on
-  // offer the renderer writes its no-pick value (test/idea-pick-required.test.mjs,
-  // test/idea-selection-empty-offer.test.mjs).
+  // "x-required" instead, a value the step must receive before its Continue sends.
+  // With no idea on offer the product's list step keeps that Continue unavailable
+  // and the run waits; a value that names no idea is refused at the step after the
+  // gate (test/idea-pick-required.test.mjs, test/idea-step-declared-screen-3470.test.mjs).
   const schema = parts.idea_selection_gate.metadata.cinatra.inputMessageSchema;
   const required = schema.required ?? [];
   assert.ok(
     !required.includes("selectedIdeaJson"),
-    "the pick is not in the object-level required list (it is declared x-required on its property instead), so the empty list is a road out and not a dead end",
+    "the pick is not in the object-level required list (it is declared x-required on its property instead), so the host's list step, not the schema, holds the Continue",
   );
   const out = parts.idea_selection_gate.outputs.find((o) => o.title === "selectedIdeaJson");
   assert.equal(out.default, "", "an unanswered pick leaves the gate as an empty pick");
