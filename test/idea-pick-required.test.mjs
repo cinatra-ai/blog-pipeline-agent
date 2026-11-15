@@ -7,9 +7,12 @@
  * property, `selectedIdeaJson`, that way, with no `default`: a property with a
  * `default` counts as answered, and then nothing holds the Continue.
  *
- * With no idea on offer the renderer answers the pick with its no-pick value. The
- * step after the gate (the reserve operation of the stored-ideas tool) must never
- * read that value as a pick: it returns a reason and writes no reservation, both
+ * With no idea on offer the step waits: the product's list step keeps the
+ * Continue unavailable, and nothing is answered for the person (the approved
+ * drawing of the list step; cinatra-ai/cinatra#3470). A value that names no idea
+ * can still reach the step after the gate, for example the no-pick value
+ * `{"noPick":true}` an earlier build of this package wrote. The reserve operation
+ * of the stored-ideas tool must never read such a value as a pick: it returns a reason and writes no reservation, both
  * for the empty list and for a list that holds ideas. The same holds for the
  * pure decision module the pack's own runner uses (`resolveIdeaPick` in
  * src/lib/blog/stored-ideas-gate.ts).
@@ -26,13 +29,9 @@ import { resolveIdeaPick } from "../src/lib/blog/stored-ideas-gate.ts";
 const OAS = JSON.parse(readFileSync(new URL("../cinatra/oas.json", import.meta.url), "utf8"));
 const GATE = OAS.$referenced_components.idea_selection_gate;
 const IDEA_TYPE = "@cinatra-ai/blog-idea-artifact:blog-idea";
-const RENDERER_URL = new URL("../src/renderers/idea-selection.ts", import.meta.url);
-
-/** The renderer's own no-pick value, read from its module, never retyped here. */
+/** The no-pick value an earlier build of this package wrote: it names no idea. */
 async function noPickValue() {
-  const mod = await import(RENDERER_URL.href);
-  assert.equal(typeof mod.NO_PICK_JSON, "string", "the renderer exports its no-pick value");
-  return mod.NO_PICK_JSON;
+  return JSON.stringify({ noPick: true });
 }
 
 /** Ports that record every call; a refused pick must make none of them. */
@@ -86,6 +85,12 @@ describe("the idea step's schema", () => {
     assert.equal(typeof description, "string");
     assert.doesNotMatch(description, /not a required field/i);
     assert.match(description, /x-required/, "the description names the declaration");
+  });
+
+  it("says that an empty list keeps the step waiting, and that nothing answers for the person", () => {
+    const description = GATE.metadata.cinatra.description;
+    assert.doesNotMatch(description, /renderer then answers/i, "no renderer of the package answers the pick");
+    assert.match(description, /waits/i, "an empty list keeps the run waiting at the step");
   });
 });
 
