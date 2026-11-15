@@ -27,6 +27,10 @@
  *   title ("Idea 2"), as the removed renderer drew it, so a sole unreadable idea
  *   never reads as an empty list and a mixed list loses none of its ideas; the
  *   row detail is the idea's words below its title, never the title again;
+ * - an idea without both halves of its reference (missing, empty or
+ *   whitespace-only) is never offered: the product cannot draw or pick it, so
+ *   it is dropped before the offer is counted and numbered, on both the tool's
+ *   path and the pack's own runner;
  * - the package ships nothing that draws: no renderer module, no component
  *   file, no copy of a product primitive, no React peer.
  *
@@ -307,6 +311,102 @@ describe("every idea the gate offers is a row the product draws", () => {
     const offer = await prepareOffer({ "idea-unreadable": null });
     assert.equal(offer.ideas[0].title, "", "the idea's title stays empty when its text cannot be read");
     assert.equal(offer.ideas[0].text, "", "no positional words reach the idea's text");
+  });
+});
+
+/** Ports whose one listing page is `entries` as given: each entry's
+ *  `artifactId` and `rev` (undefined leaves latestRepresentationRevisionId out)
+ *  go to the listing as they are, and `text` (null: the read fails) answers its
+ *  content read. Content reads are recorded. */
+function listingPorts(entries) {
+  const contentReads = [];
+  const ports = preparePorts({});
+  ports.artifacts = {
+    async list() {
+      return {
+        artifacts: entries.map((e) =>
+          e.rev === undefined
+            ? { artifactId: e.artifactId }
+            : { artifactId: e.artifactId, latestRepresentationRevisionId: e.rev },
+        ),
+      };
+    },
+    async contentRead(request) {
+      contentReads.push(request.artifactId);
+      const entry = entries.find((e) => e.artifactId === request.artifactId);
+      if (!entry || entry.text === null) throw new Error("content read failed");
+      return { artifactId: request.artifactId, text: entry.text };
+    },
+  };
+  return { ports, contentReads };
+}
+
+const prepareListing = (entries) => {
+  const { ports, contentReads } = listingPorts(entries);
+  return extensionTool({ input: { op: "prepare", ideaType: "blog-idea-type-under-test" }, ports }).then((offer) => ({
+    offer,
+    contentReads,
+  }));
+};
+
+describe("an idea without both halves of its reference is never offered", () => {
+  it("a sole idea with no revision reads as the empty list on both sides, with no content read", async () => {
+    const { offer, contentReads } = await prepareListing([{ artifactId: "idea-norev", rev: undefined, text: "A title" }]);
+    assert.equal(offer.ok, false, "the gate does not offer an idea the product cannot pick");
+    assert.deepEqual(offer.ideas, []);
+    assert.equal(offer.reason, theScreen().emptyStateMessage, "the person reads the empty-list sentence");
+    assert.deepEqual(contentReads, [], "an idea that cannot be offered costs no content read");
+  });
+
+  it("whitespace-only halves count as blank: an idea carrying them is not offered", async () => {
+    const { offer } = await prepareListing([
+      { artifactId: "idea-blankrev", rev: "   ", text: "A title" },
+      { artifactId: "  ", rev: "rev-blankid", text: "Another title" },
+    ]);
+    assert.equal(offer.ok, false);
+    assert.deepEqual(offer.ideas, []);
+  });
+
+  it("a mixed list offers exactly what the product draws, numbered without a gap", async () => {
+    const { offer } = await prepareListing([
+      { artifactId: "idea-first", rev: "rev-first", text: null },
+      { artifactId: "idea-norev", rev: undefined, text: null },
+      { artifactId: "idea-blankrev", rev: " \t", text: null },
+      { artifactId: "idea-emptyrev", rev: "", text: null },
+      { artifactId: "idea-last", rev: "rev-last", text: null },
+    ]);
+    assert.equal(offer.ok, true);
+    assert.deepEqual(
+      offer.ideas.map((i) => i.artifactId),
+      ["idea-first", "idea-last"],
+      "only ideas with both halves are offered",
+    );
+    const rows = hostRows(offer.ideas);
+    assert.equal(rows.length, offer.ideas.length, "every offered idea is a drawn row");
+    assert.deepEqual(rows.map((r) => r.title), ["Idea 1", "Idea 2"], "positions count offered ideas only");
+  });
+
+  it("the pack's own runner offers the same: blank or whitespace halves are dropped before numbering", () => {
+    const sole = offerStoredIdeas({
+      candidates: [{ artifactId: "idea-a", representationRevisionId: "  ", text: "" }],
+      takenArtifactIds: [],
+    });
+    assert.equal(sole.ok, false, "a sole idea the product cannot pick reads as the empty list");
+    const mixed = offerStoredIdeas({
+      candidates: [
+        { artifactId: "idea-a", representationRevisionId: "rev-a", text: "" },
+        { artifactId: "idea-b", representationRevisionId: "", text: "" },
+        { artifactId: " ", representationRevisionId: "rev-c", text: "" },
+        { artifactId: "idea-d", representationRevisionId: "rev-d", text: "" },
+      ],
+      takenArtifactIds: [],
+    });
+    assert.equal(mixed.ok, true);
+    if (!mixed.ok) return;
+    assert.deepEqual(mixed.ideas.map((i) => i.artifactId), ["idea-a", "idea-d"]);
+    const rows = hostRows(mixed.ideas);
+    assert.equal(rows.length, mixed.ideas.length, "every offered idea is a drawn row");
+    assert.deepEqual(rows.map((r) => r.title), ["Idea 1", "Idea 2"]);
   });
 });
 

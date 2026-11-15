@@ -5,7 +5,9 @@
  * batch the run just made: "a list of the organisation's blog ideas no draft has
  * used — each one a piece of text, its first line the title — with a button to
  * generate new ones; picks exactly one; nothing is picked for them, and an empty
- * list ends the run with a plain reason."
+ * list ends the run with a plain reason." Since the product draws the step from
+ * the declared list screen, an empty list keeps the run waiting at the step with
+ * that reason drawn, instead of ending it.
  *
  * PURE — no database, no `server-only` — so every sentence above is decided in
  * one testable place and the runner beside it only carries the reads and writes.
@@ -105,7 +107,7 @@ export interface OfferedIdeaRow extends OfferedIdea {
 
 export type StoredIdeaOffer =
   | { readonly ok: true; readonly ideas: OfferedIdeaRow[] }
-  /** The run ends here, with this sentence — never with a pick nobody made. */
+  /** The step shows this sentence and the run waits there — never with a pick nobody made. */
   | { readonly ok: false; readonly reason: string };
 
 export type IdeaPickOutcome =
@@ -206,6 +208,10 @@ export function offerStoredIdeas(input: {
   const ideas: OfferedIdeaRow[] = [];
   const seen = new Set<string>();
   for (const candidate of input.candidates) {
+    // Both halves of the reference, each non-blank, or the product's list step
+    // can neither draw nor pick the idea: left out before counting and numbering.
+    if ((candidate.artifactId ?? "").trim() === "") continue;
+    if ((candidate.representationRevisionId ?? "").trim() === "") continue;
     if (taken.has(candidate.artifactId)) continue;
     if (seen.has(candidate.artifactId)) continue;
     seen.add(candidate.artifactId);

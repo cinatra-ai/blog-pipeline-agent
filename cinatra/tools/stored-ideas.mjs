@@ -202,17 +202,18 @@ async function releaseExpiredReservations(ports, rows, now) {
 }
 
 /** The listing, as the dependency-scoped read road answers it: one page of
- *  artifact summaries, newest first. */
+ *  artifact summaries, newest first. An artifact without both halves of its
+ *  reference (an id and the revision the list offers, each non-blank) is left
+ *  out here, before the offer is counted and numbered: the product's list step
+ *  can neither draw nor pick it, and the reserve step could never take it. */
 function artifactReferences(page) {
   const artifacts = Array.isArray(page?.artifacts) ? page.artifacts : [];
   const references = [];
   for (const artifact of artifacts) {
     const artifactId = text(artifact?.artifactId);
-    if (artifactId === "") continue;
-    references.push({
-      artifactId,
-      representationRevisionId: text(artifact?.latestRepresentationRevisionId),
-    });
+    const representationRevisionId = text(artifact?.latestRepresentationRevisionId);
+    if (artifactId.trim() === "" || representationRevisionId.trim() === "") continue;
+    references.push({ artifactId, representationRevisionId });
   }
   return references;
 }

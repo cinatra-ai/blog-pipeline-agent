@@ -154,7 +154,7 @@ test("the gate offers that list, not a free-text field and not an in-run batch",
   const gate = parts.idea_selection_gate;
   const declared = (gate.inputs ?? []).map((i) => i.title);
   assert.ok(declared.includes("ideas"), "the gate declares the offered ideas as a render input");
-  assert.ok(declared.includes("reason"), "and the sentence an empty list ends the run with");
+  assert.ok(declared.includes("reason"), "and the sentence the step shows on an empty list");
   for (const name of ["ideas", "reason"]) {
     const edge = edgeInto("idea_selection_gate", name);
     assert.ok(edge, `${name} must be edge-sourced into the gate`);
@@ -487,8 +487,9 @@ test("the pipeline declares the idea-to-draft relation table it writes", () => {
 // ---------------------------------------------------------------------------
 
 test("a person offered nothing reads the plain reason, and an unanswered pick is refused after the gate", () => {
-  // "An empty list ends the run with a plain reason" (6.1 step 2). The reason is
-  // drawn at the gate; if the pick were in the schema's REQUIRED list the person
+  // "An empty list ends the run with a plain reason" (6.1 step 2); the product's
+  // list step now keeps the run waiting at the gate with that reason drawn. The
+  // reason is drawn at the gate; if the pick were in the schema's REQUIRED list the person
   // could read that sentence and never act on it — the run would park at a pause
   // nothing can answer, which is not an ending. The pick is declared
   // "x-required" instead, a value the step must receive before its Continue sends.
