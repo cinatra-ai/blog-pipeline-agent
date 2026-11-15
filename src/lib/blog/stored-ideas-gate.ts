@@ -5,7 +5,9 @@
  * batch the run just made: "a list of the organisation's blog ideas no draft has
  * used — each one a piece of text, its first line the title — with a button to
  * generate new ones; picks exactly one; nothing is picked for them, and an empty
- * list ends the run with a plain reason."
+ * list ends the run with a plain reason." Since the product draws the step from
+ * the declared list screen, an empty list keeps the run waiting at the step with
+ * that reason drawn, instead of ending it.
  *
  * PURE — no database, no `server-only` — so every sentence above is decided in
  * one testable place and the runner beside it only carries the reads and writes.
@@ -95,9 +97,17 @@ export interface OfferedIdea extends StoredIdeaCandidate {
   readonly title: string;
 }
 
+/** An offered idea as the product's list step draws it: the row title (the
+ *  idea's title, else its position in the offer) and the words below the title.
+ *  The idea's own `title` and `text` stay as they are. */
+export interface OfferedIdeaRow extends OfferedIdea {
+  readonly label: string;
+  readonly body: string;
+}
+
 export type StoredIdeaOffer =
-  | { readonly ok: true; readonly ideas: OfferedIdea[] }
-  /** The run ends here, with this sentence — never with a pick nobody made. */
+  | { readonly ok: true; readonly ideas: OfferedIdeaRow[] }
+  /** The step shows this sentence and the run waits there — never with a pick nobody made. */
   | { readonly ok: false; readonly reason: string };
 
 export type IdeaPickOutcome =
@@ -186,22 +196,32 @@ export function titleFromIdeaText(text: string): string {
  * The ideas still on offer: every candidate whose artifact no live relation row
  * names.
  *
- * A candidate with no readable text is still an idea — it is offered under an
- * empty title rather than dropped, because dropping it would silently shrink a
- * list a person is choosing from.
+ * A candidate with no readable text is still an idea — it is offered under its
+ * position as the row title ("Idea 2") rather than dropped, because dropping it
+ * would silently shrink a list a person is choosing from.
  */
 export function offerStoredIdeas(input: {
   readonly candidates: readonly StoredIdeaCandidate[];
   readonly takenArtifactIds: readonly string[];
 }): StoredIdeaOffer {
   const taken = new Set(input.takenArtifactIds);
-  const ideas: OfferedIdea[] = [];
+  const ideas: OfferedIdeaRow[] = [];
   const seen = new Set<string>();
   for (const candidate of input.candidates) {
+    // Both halves of the reference, each non-blank, or the product's list step
+    // can neither draw nor pick the idea: left out before counting and numbering.
+    if ((candidate.artifactId ?? "").trim() === "") continue;
+    if ((candidate.representationRevisionId ?? "").trim() === "") continue;
     if (taken.has(candidate.artifactId)) continue;
     if (seen.has(candidate.artifactId)) continue;
     seen.add(candidate.artifactId);
-    ideas.push({ ...candidate, title: titleFromIdeaText(candidate.text) });
+    const title = titleFromIdeaText(candidate.text);
+    ideas.push({
+      ...candidate,
+      title,
+      label: title === "" ? `Idea ${ideas.length + 1}` : title,
+      body: (candidate.text ?? "").split(/\r?\n/).slice(1).join("\n").trim(),
+    });
   }
   if (ideas.length === 0) return { ok: false, reason: EMPTY_LIST_REASON };
   return { ok: true, ideas };

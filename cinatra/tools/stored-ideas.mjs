@@ -113,6 +113,19 @@ function titleFromIdeaText(value) {
   return firstLine.replace(/^title\s*:\s*/i, "").trim();
 }
 
+/** The idea's words below its title line, as the row's detail. */
+function bodyBelowTitle(value) {
+  return text(value).split(/\r?\n/).slice(1).join("\n").trim();
+}
+
+/** The row title the product draws: the idea's own title, else its position in
+ *  the offer ("Idea 2"), so an idea whose text cannot be read is still a row a
+ *  person can pick and never reads as an empty list. The idea's `title` and
+ *  `text` stay as they are; the label is for the row only. */
+function offerLabel(title, position) {
+  return title === "" ? `Idea ${position}` : title;
+}
+
 /** The reservation rows of the organisation, which the host narrows every
  *  statement to. NOT this run's alone: a reservation another run took is exactly
  *  what this run must not take again, so the run column is not named here. */
@@ -187,24 +200,25 @@ async function releaseExpiredReservations(ports, rows, now) {
 }
 
 /** The listing, as the dependency-scoped read road answers it: one page of
- *  artifact summaries, newest first. */
+ *  artifact summaries, newest first. An artifact without both halves of its
+ *  reference (an id and the revision the list offers, each non-blank) is left
+ *  out here, before the offer is counted and numbered: the product's list step
+ *  can neither draw nor pick it, and the reserve step could never take it. */
 function artifactReferences(page) {
   const artifacts = Array.isArray(page?.artifacts) ? page.artifacts : [];
   const references = [];
   for (const artifact of artifacts) {
     const artifactId = text(artifact?.artifactId);
-    if (artifactId === "") continue;
-    references.push({
-      artifactId,
-      representationRevisionId: text(artifact?.latestRepresentationRevisionId),
-    });
+    const representationRevisionId = text(artifact?.latestRepresentationRevisionId);
+    if (artifactId.trim() === "" || representationRevisionId.trim() === "") continue;
+    references.push({ artifactId, representationRevisionId });
   }
   return references;
 }
 
 /** One idea's text. Null when the content cannot be read — a candidate with no
- *  readable text is still an idea, offered under an empty title rather than
- *  dropped, because dropping it would silently shrink the list. */
+ *  readable text is still an idea, offered under its position as the row title
+ *  rather than dropped, because dropping it would silently shrink the list. */
 async function readIdeaText(ports, reference) {
   try {
     const read = await ports.artifacts.contentRead({
@@ -222,8 +236,8 @@ async function readIdeaText(ports, reference) {
 /**
  * The list the gate offers. The list is read page by page, with the mark each
  * page returns for the next one, until the offer is full, the list has ended or
- * the page bound is reached. An empty list ends the run with the sentence it
- * carries, never with a pick nobody made.
+ * the page bound is reached. An empty list comes back with the sentence the
+ * step shows while the run waits there, never with a pick nobody made.
  */
 async function prepare(input, ports) {
   const ideaType = requireIdeaType(input);
@@ -254,7 +268,14 @@ async function prepare(input, ports) {
       seen.add(reference.artifactId);
       const read = await readIdeaText(ports, reference);
       const body = read ?? "";
-      ideas.push({ ...reference, text: body, title: titleFromIdeaText(body) });
+      const title = titleFromIdeaText(body);
+      ideas.push({
+        ...reference,
+        text: body,
+        title,
+        label: offerLabel(title, ideas.length + 1),
+        body: bodyBelowTitle(body),
+      });
     }
     if (ideas.length >= MAX_OFFERED_IDEAS) break;
     // A page may come back short, even empty, with a mark for the next one, so
