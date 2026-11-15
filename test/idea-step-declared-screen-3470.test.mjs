@@ -22,6 +22,11 @@
  *   of the list step shows;
  * - the empty-state message is the gate's own sentence for an empty offer,
  *   word for word;
+ * - every idea the gate offers is a row the product draws: an idea whose text
+ *   cannot be read, or whose first line is blank, is offered under a positional
+ *   title ("Idea 2"), as the removed renderer drew it, so a sole unreadable idea
+ *   never reads as an empty list and a mixed list loses none of its ideas; the
+ *   row detail is the idea's words below its title, never the title again;
  * - the package ships nothing that draws: no renderer module, no component
  *   file, no copy of a product primitive, no React peer.
  *
@@ -33,6 +38,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
 
+import { extensionTool } from "../cinatra/tools/stored-ideas.mjs";
 import { offerStoredIdeas, resolveIdeaPick } from "../src/lib/blog/stored-ideas-gate.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -137,8 +143,8 @@ describe("the idea step's binding", () => {
     const screen = theScreen();
     assert.equal(GATE.metadata.cinatra.surfaceGateInputs, true, "the gate surfaces its inputs to the step");
     assert.equal(screen.items, "ideas");
-    assert.equal(screen.title, "text", "the row title is the first line of the idea's text");
-    assert.equal(screen.detail, "text", "the detail line is the rest of the idea's text");
+    assert.equal(screen.title, "label", "the row title is the offer's label: the idea's title, else its position");
+    assert.equal(screen.detail, "body", "the detail line is the idea's words below its title");
     assert.deepEqual(screen.pickKeys, ["artifactId", "representationRevisionId"]);
   });
 
@@ -157,6 +163,12 @@ describe("the idea step's binding", () => {
     }
   });
 
+  it("the preparation step says the empty list keeps the run waiting, not that it ends the run", () => {
+    const description = OAS.$referenced_components.prepare_ideas.metadata.cinatra.description;
+    assert.doesNotMatch(description, /the run ends on/i, "the empty list no longer ends the run");
+    assert.match(description, /waits/i, "the run waits at the step while the list is empty");
+  });
+
   it("the empty-state message is the gate's sentence for an empty offer, word for word", () => {
     const offer = offerStoredIdeas({ candidates: [], takenArtifactIds: [] });
     assert.equal(offer.ok, false);
@@ -173,6 +185,128 @@ describe("the idea step's binding", () => {
     if (!outcome.ok) return;
     assert.equal(outcome.idea.artifactId, chosen.artifactId);
     assert.equal(outcome.idea.representationRevisionId, chosen.representationRevisionId);
+  });
+});
+
+/**
+ * The product's reading of one offered entry, as the list step reads it
+ * (cinatra-ai/cinatra#3470, packages/agents/src/declared-list-step.ts): only own
+ * keys; every pick key must be non-blank text; the row title is the first line of
+ * the declared title key and must be non-blank; the detail is the declared detail
+ * key, or the title's other lines when both name the same key. An entry the
+ * product cannot title is NOT drawn, so an offer of such entries reads as empty.
+ */
+function hostRow(screen, entry) {
+  const ownText = (key) => (Object.hasOwn(entry, key) && typeof entry[key] === "string" ? entry[key] : "");
+  const reference = {};
+  for (const key of screen.pickKeys) {
+    if (ownText(key).trim() === "") return null;
+    reference[key] = ownText(key);
+  }
+  const titleLines = ownText(screen.title).split(/\r?\n/);
+  const title = titleLines[0].trim();
+  if (title === "") return null;
+  const detail =
+    screen.detail === screen.title ? titleLines.slice(1).join("\n").trim() : ownText(screen.detail).trim();
+  return { reference: JSON.stringify(reference), title, detail };
+}
+
+function hostRows(ideas) {
+  const screen = theScreen();
+  return ideas.map((idea) => hostRow(screen, idea)).filter((r) => r !== null);
+}
+
+/** Ports for the preparation step: one listing page of `ideas` (id -> text, or
+ *  null for a content read that fails) with no mark for a next page, no
+ *  relation rows, a fixed clock. */
+function preparePorts(ideas) {
+  return {
+    data: {
+      async select() {
+        return { rows: [], rowCount: 0 };
+      },
+    },
+    artifacts: {
+      async list() {
+        return {
+          artifacts: Object.keys(ideas).map((id) => ({ artifactId: id, latestRepresentationRevisionId: `${id}-rev` })),
+        };
+      },
+      async contentRead(request) {
+        const body = ideas[request.artifactId];
+        if (body === null) throw new Error("content read failed");
+        return { artifactId: request.artifactId, text: body };
+      },
+    },
+    review: {
+      file() {
+        throw new Error("prepare files no review");
+      },
+    },
+    clock: {
+      now() {
+        return new Date("2026-11-15T18:00:00.000Z");
+      },
+    },
+  };
+}
+
+const prepareOffer = (ideas) =>
+  extensionTool({ input: { op: "prepare", ideaType: "blog-idea-type-under-test" }, ports: preparePorts(ideas) });
+
+describe("every idea the gate offers is a row the product draws", () => {
+  it("a sole idea whose text cannot be read is offered under a positional title, never read as an empty list", async () => {
+    const offer = await prepareOffer({ "idea-unreadable": null });
+    assert.equal(offer.ok, true, "the gate offers the unreadable idea");
+    const rows = hostRows(offer.ideas);
+    assert.equal(rows.length, 1, "the product draws the offered idea; the step does not read as empty");
+    assert.equal(rows[0].title, "Idea 1");
+    assert.equal(rows[0].detail, "");
+    assert.equal(
+      rows[0].reference,
+      JSON.stringify({ artifactId: "idea-unreadable", representationRevisionId: "idea-unreadable-rev" }),
+    );
+  });
+
+  it("a list mixing readable, unreadable and untitled ideas loses none of them", async () => {
+    const offer = await prepareOffer({
+      "idea-readable": "Title: Why small teams ship faster\nA short look at how fewer hand-offs shorten the road.",
+      "idea-unreadable": null,
+      "idea-untitled": "\nWords with no title line.",
+    });
+    assert.equal(offer.ok, true);
+    const rows = hostRows(offer.ideas);
+    assert.deepEqual(
+      rows.map((r) => r.title),
+      ["Why small teams ship faster", "Idea 2", "Idea 3"],
+      "every offered idea is a row, in offer order",
+    );
+    assert.deepEqual(
+      rows.map((r) => r.detail),
+      ["A short look at how fewer hand-offs shorten the road.", "", "Words with no title line."],
+      "the detail is the idea's words below its title, never the title again",
+    );
+  });
+
+  it("the pack's own runner offers the same rows", () => {
+    const offer = offerStoredIdeas({
+      candidates: [
+        { artifactId: "idea-a", representationRevisionId: "rev-a", text: "Shipping on Fridays\nWhy not." },
+        { artifactId: "idea-b", representationRevisionId: "rev-b", text: "" },
+      ],
+      takenArtifactIds: [],
+    });
+    assert.equal(offer.ok, true);
+    if (!offer.ok) return;
+    const rows = hostRows(offer.ideas);
+    assert.deepEqual(rows.map((r) => r.title), ["Shipping on Fridays", "Idea 2"]);
+    assert.deepEqual(rows.map((r) => r.detail), ["Why not.", ""]);
+  });
+
+  it("keeps the idea's own title and text for the run: the label is for the row only", async () => {
+    const offer = await prepareOffer({ "idea-unreadable": null });
+    assert.equal(offer.ideas[0].title, "", "the idea's title stays empty when its text cannot be read");
+    assert.equal(offer.ideas[0].text, "", "no positional words reach the idea's text");
   });
 });
 
