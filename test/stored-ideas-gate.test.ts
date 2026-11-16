@@ -343,7 +343,7 @@ describe("the reservation row and its uniqueness rule", () => {
     assert.equal(IDEA_RELATION_TABLE, "ext_cinatra_ai_blog_pipeline_agent_idea_drafts");
   });
 
-  it("ends a run with a stated reason when the organisation has no stored idea at all", async () => {
+  it("keeps the run waiting with a stated reason when the organisation has no stored idea at all", async () => {
     const out = await prepareStoredIdeas({
       ports: ports({ async listIdeaArtifacts() { return []; } }),
       orgId: "org-1",
