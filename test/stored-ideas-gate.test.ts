@@ -11,7 +11,11 @@
  * reservation row under a uniqueness rule that allows one live reservation or
  * relation per idea, so two runs that offer the same idea cannot both take it:
  * the second pick is refused at the gate. An empty list ends the run with a
- * stated reason instead of a pick."
+ * stated reason instead of a pick." Since the product draws the step from the
+ * declared list screen, an empty list no longer ends the run: the offer carries
+ * no pick, the step shows the stated reason with its Continue unavailable, and
+ * the run waits at the step. The reason says that this run cannot go on and
+ * that the person cancels it.
  *
  * The gate's decision module and its prepare/reserve/complete/release flow live
  * in THIS repository, so this suite is the whole proof of them: the two fixtures
@@ -142,6 +146,10 @@ describe("the offered list", () => {
     if (offer.ok) return;
     assert.match(offer.reason, /no blog idea/i);
     assert.match(offer.reason, /draft/i);
+    // The run waits at the step: the reason never says the run ends, and it says
+    // that this run cannot go on and that the person cancels it.
+    assert.doesNotMatch(offer.reason, /\bthe run ends\b|\bends the run\b/i);
+    assert.match(offer.reason, /this run cannot go on: cancel it\./i, "the waiting run is named, with its way out");
   });
 });
 
