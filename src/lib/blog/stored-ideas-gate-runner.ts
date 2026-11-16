@@ -130,8 +130,8 @@ async function releaseExpiredReservations(input: {
 }
 
 /**
- * The list the gate offers. A refusal here ends the run with the sentence it
- * carries — "an empty list ends the run with a plain reason".
+ * The list the gate offers. A refusal here carries the sentence the step shows
+ * for an empty list; the run then waits at the step, which offers nothing to pick.
  */
 export async function prepareStoredIdeas(input: {
   readonly ports: StoredIdeasPorts;

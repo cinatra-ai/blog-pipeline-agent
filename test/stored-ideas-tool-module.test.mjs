@@ -305,7 +305,7 @@ describe("op prepare", () => {
     );
   });
 
-  it("ends the run with a stated reason when nothing is left to draft", async () => {
+  it("offers no pick and states the reason when nothing is left to draft", async () => {
     const p = ports({ rows: [reserved(IDEA_A.artifactId), reserved(IDEA_B.artifactId)] });
     const result = await extensionTool({ input: { op: "prepare", ideaType: IDEA_TYPE }, ports: p });
     assert.equal(result.ok, false);
@@ -313,7 +313,7 @@ describe("op prepare", () => {
     assert.equal(
       result.reason,
       offerStoredIdeas({ candidates: [], takenArtifactIds: [] }).reason,
-      "the sentence the gate's own decision module ends the run with",
+      "the sentence the gate's own decision module states for an empty offer",
     );
   });
 

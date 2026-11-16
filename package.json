@@ -1,6 +1,6 @@
 {
   "name": "@cinatra-ai/blog-pipeline-agent",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "license": "Apache-2.0",
   "description": "Parent orchestrator (WayFlow Flow OAS) that turns one stored blog idea into a reviewed blog post, its featured image and the LinkedIn post that announces it. Manual brief / reference artifacts input only; transcript input is not accepted. projectId threaded across children. Four HITL pauses of its own: the brand-voice pick handed down to the writing and image steps, then the stored-ideas gate, the review the run parks at, and the LinkedIn post; the review DECISION is core's (artifact-lifecycle interception), this flow declares the pause and names the run's own revisions as its targets.",
   "type": "module",
@@ -127,7 +127,7 @@
           "detail": "body",
           "pickKeys": ["artifactId", "representationRevisionId"],
           "answerKeys": ["selectedIdeaJson", "userResponse"],
-          "emptyStateMessage": "There is no blog idea left to draft: every stored idea already has a draft or is reserved by another run. This list was read when the run reached this step, and it does not change while the run waits here. Generate new ideas; the next run of this pipeline offers them."
+          "emptyStateMessage": "There is no blog idea left to draft: every stored idea already has a draft or is reserved by another run. This list was read when the run reached this step and does not change, so this run cannot go on: cancel it. Generate new ideas; the next run of this pipeline offers them."
         }
       }
     ],

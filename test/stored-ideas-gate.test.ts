@@ -133,7 +133,7 @@ describe("the offered list", () => {
     assert.deepEqual(offer.ideas.map((i) => i.artifactId), ["idea-b"]);
   });
 
-  it("ends the run with a stated reason when nothing is left to offer", () => {
+  it("offers no pick and states the reason when nothing is left to offer", () => {
     const offer = offerStoredIdeas({
       candidates: [IDEA_A],
       takenArtifactIds: ["idea-a"],
