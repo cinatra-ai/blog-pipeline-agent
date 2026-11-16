@@ -3,10 +3,10 @@
  *
  * The host draws the stored-ideas step from what this pack declares on its one
  * field-renderer binding, in the binding's declared list screen: the question
- * the step asks, and the message it shows when the declared list is empty. The run waits at that step, so the message
- * never sends the reader away to start the pipeline again, and the list is read
- * once when the run reaches the step, so the message never promises a new list
- * on reopening it. The sentence the gate returns for an empty offer is the
+ * the step asks, and the message it shows when the declared list is empty. The run waits at that step and
+ * cannot go on from it, so the message tells the reader to cancel the run, never
+ * to start the pipeline again from inside it, and the list is read once when the
+ * run reaches the step, so the message never promises a new list on reopening it. The sentence the gate returns for an empty offer is the
  * declared message, word for word.
  *
  *   node --test test/idea-step-declaration.test.mjs
@@ -62,7 +62,7 @@ describe("the idea step's declared words", () => {
     assert.equal(offer.reason, declared);
   });
 
-  it("the message never sends the reader away from a run that waits, and never promises a new list", () => {
+  it("the message never tells the reader to start the pipeline again, and never promises a new list", () => {
     const declared = theBinding().screen?.emptyStateMessage;
     const offer = offerStoredIdeas({ candidates: [], takenArtifactIds: [] });
     assert.equal(offer.ok, false);

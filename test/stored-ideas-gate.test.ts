@@ -11,7 +11,11 @@
  * reservation row under a uniqueness rule that allows one live reservation or
  * relation per idea, so two runs that offer the same idea cannot both take it:
  * the second pick is refused at the gate. An empty list ends the run with a
- * stated reason instead of a pick."
+ * stated reason instead of a pick." Since the product draws the step from the
+ * declared list screen, an empty list no longer ends the run: the offer carries
+ * no pick, the step shows the stated reason with its Continue unavailable, and
+ * the run waits at the step. The reason says that this run cannot go on and
+ * that the person cancels it.
  *
  * The gate's decision module and its prepare/reserve/complete/release flow live
  * in THIS repository, so this suite is the whole proof of them: the two fixtures
@@ -133,7 +137,7 @@ describe("the offered list", () => {
     assert.deepEqual(offer.ideas.map((i) => i.artifactId), ["idea-b"]);
   });
 
-  it("ends the run with a stated reason when nothing is left to offer", () => {
+  it("offers no pick and states the reason when nothing is left to offer", () => {
     const offer = offerStoredIdeas({
       candidates: [IDEA_A],
       takenArtifactIds: ["idea-a"],
@@ -142,6 +146,10 @@ describe("the offered list", () => {
     if (offer.ok) return;
     assert.match(offer.reason, /no blog idea/i);
     assert.match(offer.reason, /draft/i);
+    // The run waits at the step: the reason never says the run ends, and it says
+    // that this run cannot go on and that the person cancels it.
+    assert.doesNotMatch(offer.reason, /\bthe run ends\b|\bends the run\b/i);
+    assert.match(offer.reason, /this run cannot go on: cancel it\./i, "the waiting run is named, with its way out");
   });
 });
 
@@ -335,7 +343,7 @@ describe("the reservation row and its uniqueness rule", () => {
     assert.equal(IDEA_RELATION_TABLE, "ext_cinatra_ai_blog_pipeline_agent_idea_drafts");
   });
 
-  it("ends a run with a stated reason when the organisation has no stored idea at all", async () => {
+  it("keeps the run waiting with a stated reason when the organisation has no stored idea at all", async () => {
     const out = await prepareStoredIdeas({
       ports: ports({ async listIdeaArtifacts() { return []; } }),
       orgId: "org-1",
