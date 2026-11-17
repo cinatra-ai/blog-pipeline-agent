@@ -1,0 +1,22 @@
+name: agent-publish-gate
+
+# Runs the shared agent pack publish gate on this pack's flow: every step that
+# can reach a connector declares `metadata.cinatra.publishes`, and the pack keeps
+# no confirm step of its own in front of a publishing step. The workflow ref and
+# the `ref` input pin the same commit, so the gate code never comes from a
+# moving branch.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  agent-publish-gate:
+    uses: cinatra-ai/ci/.github/workflows/agent-publish-gate.yml@05938c0ca644e04233af3620a65dbb850d3b0d79 # v0.1.4-next.05938c0
+    with:
+      package: "."
+      ref: 05938c0ca644e04233af3620a65dbb850d3b0d79

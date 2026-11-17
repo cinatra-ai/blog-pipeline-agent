@@ -1607,6 +1607,7 @@
         "cinatra": {
           "riskClass": "write",
           "requiresApproval": false,
+          "publishes": false,
           "packageName": "@cinatra-ai/blog-pipeline-agent",
           "description": "The pick is the reservation (plan (C) section 5.1): the chosen artifact and revision are validated against the very list the person was shown and written as one reservation row under the rule that allows one live row per idea, so of two runs offering the same idea only one takes it and the loser is told so. The idea's own words come back as the draft writer's one input. A refused pick answers with its reason and none of the three fields below, which carry no default: the run ends there rather than drafting an idea nobody chose."
         }
@@ -1622,7 +1623,8 @@
       "metadata": {
         "cinatra": {
           "packageName": "@cinatra-ai/blog-draft-writer-agent",
-          "description": "Child generation FlowNode to @cinatra-ai/blog-draft-writer-agent, at the one input its own repository now takes: the chosen idea as plain text. It answers with the post's title, its excerpt and its markdown, which the step after this one writes as the run's own blog-post artifact."
+          "description": "Child generation FlowNode to @cinatra-ai/blog-draft-writer-agent, at the one input its own repository now takes: the chosen idea as plain text. It answers with the post's title, its excerpt and its markdown, which the step after this one writes as the run's own blog-post artifact.",
+          "publishes": false
         }
       }
     },
@@ -2402,6 +2404,7 @@
         "cinatra": {
           "riskClass": "write",
           "requiresApproval": false,
+          "publishes": false,
           "packageName": "@cinatra-ai/blog-pipeline-agent",
           "description": "The mid-run write of plan (C) section 6.1 step 3: the draft becomes a blog-post artifact while the run is still going, so the review that follows opens on an immutable revision of the real post instead of on loose text. The reference it returns is what the projection hands the review step and what the picture is filed against."
         }
@@ -2417,7 +2420,8 @@
       "metadata": {
         "cinatra": {
           "packageName": "@cinatra-ai/blog-image-generator-agent",
-          "description": "Child FlowNode to @cinatra-ai/blog-image-generator-agent, the image maker the retired prompt writer became. It runs on the post the run just wrote and before the review, so the review sees the post with its featured image. This step settles the featured image's prompt and its alternative text; the next step files the picture through the host's image tool, and the review's target set names it after the post."
+          "description": "Child FlowNode to @cinatra-ai/blog-image-generator-agent, the image maker the retired prompt writer became. It runs on the post the run just wrote and before the review, so the review sees the post with its featured image. This step settles the featured image's prompt and its alternative text; the next step files the picture through the host's image tool, and the review's target set names it after the post.",
+          "publishes": false
         }
       }
     },
@@ -3079,6 +3083,7 @@
         "cinatra": {
           "riskClass": "write",
           "requiresApproval": false,
+          "publishes": false,
           "packageName": "@cinatra-ai/blog-pipeline-agent",
           "description": "The featured image the step before settled is filed here as an image through the host's image tool, named after the post and carrying the post it belongs to, its placement and its alternative text. The reference it returns is what the review's target set names second."
         }
@@ -3160,6 +3165,7 @@
         "cinatra": {
           "riskClass": "write",
           "requiresApproval": false,
+          "publishes": false,
           "packageName": "@cinatra-ai/blog-pipeline-agent",
           "description": "Two sentences of plan (C) section 6.1 in one call. It completes the reservation into the relation row \u2014 this idea, this draft, keyed by immutable claim, run and idea so a retry completes the same row and never a second \u2014 and it is the projection step of section 8.4: the call echoes its own input back, so the immutable reference the mid-run write returned reaches the review step as the set the marker below names. The set names the post first and its featured image second. The call answers with the completion own ok flag, so a completion that did not land is visible in the run rather than hidden behind the echo; the run does not branch on it here, and an uncompleted reservation lapses on its own."
         }
@@ -3233,7 +3239,8 @@
       "metadata": {
         "cinatra": {
           "packageName": "@cinatra-ai/blog-linkedin-writer-agent",
-          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-linkedin-writer-agent."
+          "description": "Child generation FlowNode \u2192 @cinatra-ai/blog-linkedin-writer-agent.",
+          "publishes": false
         }
       }
     },
@@ -3686,6 +3693,7 @@
         "cinatra": {
           "riskClass": "write",
           "requiresApproval": false,
+          "publishes": false,
           "packageName": "@cinatra-ai/blog-pipeline-agent",
           "description": "The LinkedIn post the writer made is written here as a LinkedIn post draft while the run is still going, so the review that follows opens on an immutable revision of the real post instead of on loose text. The reference it returns is what the next step hands the review."
         }
@@ -3743,6 +3751,7 @@
         "cinatra": {
           "riskClass": "write",
           "requiresApproval": false,
+          "publishes": false,
           "packageName": "@cinatra-ai/blog-pipeline-agent",
           "description": "The projection step of the LinkedIn post's review: the call files the immutable reference the write before returned, and the host answers with the set it validated, so that set reaches the review step as the input the marker below names. The set names the LinkedIn post alone; the call writes no row and answers with its own ok flag."
         }
