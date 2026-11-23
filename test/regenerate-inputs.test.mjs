@@ -104,3 +104,89 @@ for (const { input, step, child, port, node } of WIRES) {
     assert.match(readme, new RegExp(`\`${input}\``));
   });
 }
+
+// The manifest's `cinatra.lifecycle.regenerate` declaration (cinatra-ai/cinatra#4264).
+//
+// Per artifact-filing node it names the producing step a Regenerate reruns and
+// the plain string input of that step the reviewer's note goes into. The
+// application refuses the declaration at compile time unless the names fit the
+// flow (checkRegenerateDeclaration in packages/agents/src/verdaccio/package-contract.ts).
+// These tests read the SHIPPED package.json and flow file and apply that same
+// rule, so a renamed node or input fails here and not at an install.
+
+const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const DECLARED = [
+  { artifactNode: "write_draft", step: "draft_flow", noteInput: "note" },
+  { artifactNode: "file_image", step: "image_flow", noteInput: "prompt" },
+];
+const ref = (v) => v?.$component_ref;
+// Exactly one canonical { title, type: "string" } port of that name.
+const stringPort = (ports, name) => {
+  const found = (ports ?? []).filter((p) => p.title === name);
+  return found.length === 1 && found[0].type === "string";
+};
+
+test("the manifest declares both Regenerate entries and nothing else under lifecycle", () => {
+  assert.deepEqual(pkg.cinatra.lifecycle?.regenerate, DECLARED);
+  assert.deepEqual(Object.keys(pkg.cinatra.lifecycle), ["regenerate"]);
+});
+
+test("the declaration fits the schema: unique nodes, identifier note inputs, no other keys", () => {
+  const entries = pkg.cinatra.lifecycle.regenerate;
+  assert.equal(new Set(entries.map((e) => e.artifactNode)).size, entries.length);
+  for (const e of entries) {
+    assert.deepEqual(Object.keys(e).sort(), ["artifactNode", "noteInput", "step"]);
+    assert.match(e.noteInput, /^[A-Za-z_][A-Za-z0-9_]*$/);
+    assert.ok(!(e.noteInput in Object.prototype));
+    assert.notEqual(e.noteInput, "lifecycleRepairRequest");
+  }
+});
+
+for (const { artifactNode, step, noteInput } of DECLARED) {
+  test(`${step} -> ${artifactNode}: both are top-level nodes of the right kind, joined by a data edge`, () => {
+    const tops = oas.nodes.map(ref);
+    assert.ok(tops.includes(step) && tops.includes(artifactNode), "both are top-level nodes");
+    assert.equal(refs[step].component_type, "FlowNode");
+    // Only an ApiNode signs its own step id when it files an artifact.
+    assert.equal(refs[artifactNode].component_type, "ApiNode");
+    assert.ok(
+      oas.data_flow_connections.some(
+        (c) => ref(c.source_node) === step && ref(c.destination_node) === artifactNode,
+      ),
+      `a data edge runs from ${step} to ${artifactNode}`,
+    );
+  });
+
+  test(`${step}: \`${noteInput}\` is a plain string input of the subflow's start node`, () => {
+    const sub = refs[ref(refs[step].subflow)];
+    assert.equal(sub.component_type, "Flow");
+    const subStart = (sub.$referenced_components ?? {})[ref(sub.start_node)] ?? refs[ref(sub.start_node)];
+    assert.equal(subStart.component_type, "StartNode");
+    assert.ok(stringPort(subStart.inputs, noteInput), "the subflow's StartNode carries it");
+    if (Array.isArray(refs[step].inputs)) assert.ok(stringPort(refs[step].inputs, noteInput));
+  });
+
+  test(`${step}: exactly one edge fills \`${noteInput}\`, from a string output of the start node that feeds nothing else`, () => {
+    const startId = ref(oas.start_node);
+    const incoming = oas.data_flow_connections.filter(
+      (c) => ref(c.destination_node) === step && c.destination_input === noteInput,
+    );
+    assert.equal(incoming.length, 1);
+    const output = incoming[0].source_output;
+    assert.equal(ref(incoming[0].source_node), startId);
+    assert.ok(stringPort(refs[startId].outputs ?? refs[startId].inputs, output), "the start node's port");
+    assert.ok(stringPort(oas.inputs, output), "the flow's root input");
+    const fanOut = oas.data_flow_connections.filter(
+      (c) => ref(c.source_node) === startId && c.source_output === output,
+    );
+    assert.equal(fanOut.length, 1, `${output} feeds nothing else`);
+  });
+}
+
+test("the note inputs are fed by the start outputs draftNote and imagePrompt", () => {
+  const source = (step, input) =>
+    oas.data_flow_connections.find((c) => ref(c.destination_node) === step && c.destination_input === input)
+      .source_output;
+  assert.equal(source("draft_flow", "note"), "draftNote");
+  assert.equal(source("image_flow", "prompt"), "imagePrompt");
+});
