@@ -31,7 +31,7 @@
         "edgeType": "runtime",
         "versionConstraint": {
           "kind": "semver-range",
-          "range": "^0.1.0"
+          "range": "^0.2.2"
         },
         "requirement": "required",
         "kind": "agent"
@@ -41,7 +41,7 @@
         "edgeType": "runtime",
         "versionConstraint": {
           "kind": "semver-range",
-          "range": "^0.1.0"
+          "range": "^0.2.0"
         },
         "requirement": "required",
         "kind": "agent"
@@ -51,7 +51,7 @@
         "edgeType": "runtime",
         "versionConstraint": {
           "kind": "semver-range",
-          "range": "^0.1.0"
+          "range": "^0.1.4"
         },
         "requirement": "required",
         "kind": "agent"
@@ -61,7 +61,7 @@
         "edgeType": "runtime",
         "versionConstraint": {
           "kind": "semver-range",
-          "range": "^0.1.0"
+          "range": "^0.2.0"
         },
         "requirement": "required",
         "kind": "agent"
