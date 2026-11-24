@@ -160,3 +160,26 @@ test("every input the run starts from is one the person is asked for, or a hidde
     "required or hidden names an input the start node does not declare",
   );
 });
+
+test("#3033: every agent edge's range admits the child version the run embeds", () => {
+  // The host refuses an embedded child's tool call (edge-constraint-unmet) when
+  // the parent's declared range does not include the installed child's version.
+  // `^0.1.0` admitted none of the draft writer 0.2.x, the idea generator 0.2.x or
+  // the LinkedIn writer 0.2.x. The draft writer 0.2.2 and the image generator
+  // 0.1.4 are the first versions that declare `brand_voice_text` embeddable,
+  // which the embedded `read_brand_voice` steps call.
+  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  const ranges = Object.fromEntries(
+    pkg.cinatra.dependencies
+      .filter((d) => d.kind === "agent")
+      .map((d) => [d.packageName, d.versionConstraint]),
+  );
+  const caret = (range) => ({ kind: "semver-range", range });
+  assert.deepEqual(ranges, {
+    "@cinatra-ai/blog-draft-writer-agent": caret("^0.2.2"),
+    "@cinatra-ai/blog-idea-generator-agent": caret("^0.2.0"),
+    "@cinatra-ai/blog-image-generator-agent": caret("^0.1.4"),
+    "@cinatra-ai/blog-linkedin-writer-agent": caret("^0.2.0"),
+    "@cinatra-ai/context-selection-agent": caret("^0.1.1"),
+  });
+});

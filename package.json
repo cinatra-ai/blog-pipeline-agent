@@ -1,6 +1,6 @@
 {
   "name": "@cinatra-ai/blog-pipeline-agent",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "license": "Apache-2.0",
   "description": "Parent orchestrator (WayFlow Flow OAS) that turns one stored blog idea into a reviewed blog post, its featured image and the LinkedIn post that announces it. Manual brief / reference artifacts input only; transcript input is not accepted. projectId threaded across children. Four HITL pauses of its own: the brand-voice pick handed down to the writing and image steps, then the stored-ideas gate, the review the run parks at, and the LinkedIn post; the review DECISION is core's (artifact-lifecycle interception), this flow declares the pause and names the run's own revisions as its targets.",
   "type": "module",
@@ -31,7 +31,7 @@
         "edgeType": "runtime",
         "versionConstraint": {
           "kind": "semver-range",
-          "range": "^0.1.0"
+          "range": "^0.2.2"
         },
         "requirement": "required",
         "kind": "agent"
@@ -41,7 +41,7 @@
         "edgeType": "runtime",
         "versionConstraint": {
           "kind": "semver-range",
-          "range": "^0.1.0"
+          "range": "^0.2.0"
         },
         "requirement": "required",
         "kind": "agent"
@@ -51,7 +51,7 @@
         "edgeType": "runtime",
         "versionConstraint": {
           "kind": "semver-range",
-          "range": "^0.1.0"
+          "range": "^0.1.4"
         },
         "requirement": "required",
         "kind": "agent"
@@ -61,7 +61,7 @@
         "edgeType": "runtime",
         "versionConstraint": {
           "kind": "semver-range",
-          "range": "^0.1.0"
+          "range": "^0.2.0"
         },
         "requirement": "required",
         "kind": "agent"
