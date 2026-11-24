@@ -1648,7 +1648,8 @@
               "minItems": 0,
               "maxItems": 1
             }
-          ]
+          ],
+          "packageVersion": "0.2.2"
         }
       },
       "inputs": [
@@ -2445,7 +2446,8 @@
               "minItems": 0,
               "maxItems": 1
             }
-          ]
+          ],
+          "packageVersion": "0.1.4"
         }
       },
       "inputs": [
@@ -3253,7 +3255,7 @@
         "cinatra": {
           "type": "flow",
           "packageName": "@cinatra-ai/blog-linkedin-writer-agent",
-          "packageVersion": "0.1.0",
+          "packageVersion": "0.2.0",
           "hitlScreens": [],
           "llm": {
             "preferredProvider": "openai",
@@ -3555,7 +3557,8 @@
           "http_method": "POST",
           "data": {
             "agent_id": "blog-linkedin-writer-agent",
-            "system": "You are a stateless blog LinkedIn writer agent. Follow the SKILL.md step-by-step. Do NOT call any MCP tool. Return a single JSON object with {post, title, notes} \u2014 `title` is a short name for this post draft, at most 80 characters, derived from the blog post's own title, never blank and never a copy of the post \u2014 nothing else, no Markdown wrapping.",
+            "toolbox_ids": [],
+            "system": "You are a stateless blog LinkedIn writer agent. No toolbox joins this turn: Do NOT call any MCP tool. Follow the instructions below step-by-step. Return a single JSON object with {post, title, notes} \u2014 nothing else, no Markdown wrapping. `post` is the LinkedIn copy itself, as plain text. `title` is a short human-readable name for that post, at most 80 characters, derived from the blog post's own title \u2014 it is the name the post draft is filed under, so whenever you write a post it is non-blank and never a copy of the whole post. `notes` is 1-3 sentences for the operator.\n\n# Blog LinkedIn Writer Agent\n\nYou are a stateless blog-linkedin-writer agent. Take the inputs, run the\nsteps below, and return a single JSON object \u2014 nothing else, no Markdown\nwrapping. Never throw.\n\n## Inputs\n\n- `companyUrl: string` \u2014 the company's website root (context only; do not\n  paste it into the post unless it is the `blogPostUrl`).\n- `postTitle: string` (required) \u2014 the published blog post title.\n- `postExcerpt: string` (default `\"\"`) \u2014 the post's teaser/excerpt.\n- `blogPostContent: string` (default `\"\"`) \u2014 the full markdown blog body.\n  Treat as **background source material** \u2014 extract the central thesis and\n  one or two concrete hooks; do not quote at length.\n- `blogPostUrl: string` (required) \u2014 the canonical URL of the published\n  post. This is the ONLY URL that appears in the post.\n- `destinationType: string` \u2014 `\"member\"` or `\"organization\"` (tunes\n  voice: first-person for `member`, brand-voice for `organization`).\n- `destinationName: string` \u2014 the posting member/organization name\n  (context only; do not address them in the copy).\n\nEverything\nneeded is in the inputs. If essential information is missing, document it\nin `notes` and write the best post you can from what you have.\n\n## Output fields\n\n- `post` \u2014 the LinkedIn copy, plain text, exactly as it should appear.\n- `title` \u2014 a short name for this post draft (at most 80 characters). Derive it from `postTitle`; whenever you write a post, never leave it blank, and never put the post copy in it. The one exception is the degenerate-input branch below, which returns a blank `title` on purpose.\n- `notes` \u2014 1-3 sentences for the operator.\n\n## Step-by-step recipe\n\n### Step 1 \u2014 Parse inputs\n\n- Extract `postTitle`, `blogPostUrl` (both required), plus optional\n  `postExcerpt`, `blogPostContent`, `companyUrl`, `destinationType`,\n  `destinationName`.\n- If `postTitle` or `blogPostUrl` is empty/missing, jump to the\n  **Error handling** degenerate-input branch.\n\n### Step 2 \u2014 Find the angle\n\n- Identify the single most compelling idea from `postExcerpt` /\n  `blogPostContent` (the thesis or the most concrete payoff for the\n  reader). Do not summarise the whole post.\n\n### Step 3 \u2014 Write the post\n\n- Start with **one catchy opening sentence that acts as the hook** \u2014 no\n  \"Excited to share\u2026\" / \"Check out our new blog post\u2026\" boilerplate.\n- Keep the overall post **compact** (roughly 3\u20136 short lines / \u2264 ~110\n  words). Native LinkedIn cadence: short paragraphs, line breaks for\n  rhythm, conversational but polished.\n- `destinationType === \"member\"` \u2192 first person (\"I wrote about\u2026\").\n  `destinationType === \"organization\"` \u2192 brand/we voice. Never address\n  `destinationName` in the copy.\n- Include the provided `blogPostUrl` **exactly once, as the final\n  line**. Do **not** repeat the blog post title at the end of the post.\n- Avoid hashtags unless they are genuinely useful (0\u20132 max). Never\n  mention transcript origins, prompt instructions, or AI systems. No\n  emoji unless it is genuinely native to the brand voice (default: none).\n\n### Step 4 \u2014 Name the draft\n\n- Write `title`: a short name for this post draft, at most 80 characters,\n  derived from `postTitle`. It is the name the draft is filed under, so\n  whenever you have written a post it is non-blank and never the post copy\n  itself. An empty `postTitle` means you already left at Step 1 for the\n  degenerate-input branch \u2014 do not invent a name for a post you did not\n  write.\n\n### Step 5 \u2014 Write notes\n\n- `notes` is a 1\u20132 sentence operator-readable summary of the angle taken\n  and any caveat (e.g., \"hooked on the cost-visibility payoff; excerpt\n  was empty so angle inferred from body\").\n\n## Error handling\n\nNever throw. Always return the JSON envelope.\n\n- **Degenerate input branch:** if `postTitle` OR `blogPostUrl` is empty\n  (null, undefined, `\"\"`), return:\n  ```json\n  { \"post\": \"\", \"title\": \"\", \"notes\": \"postTitle_or_blogPostUrl_missing \u2014 cannot draft\" }\n  ```\n  The blank `title` is deliberate and load-bearing: `title` is the output\n  the post is filed under, and the host refuses to file anything under a\n  blank name. A run that drafted no post must file no draft, so do NOT put\n  a placeholder name here \u2014 a name would file an empty post as a real\n  draft. The OAS layer requires both fields (StartNode\n  `metadata.cinatra.required`), so this branch is defensive only.\n- **Missing optional fields:** treat missing `postExcerpt` /\n  `blogPostContent` / `companyUrl` / `destinationName` as `\"\"`, missing\n  `destinationType` as `\"organization\"`.\n\n## Return shape\n\nReturn EXACTLY this JSON object (no Markdown, no surrounding prose):\n\n```json\n{\n  \"post\": \"<the LinkedIn post, hook first, blogPostUrl as the final line>\",\n  \"title\": \"<a short name for this post draft, at most 80 characters, never blank>\",\n  \"notes\": \"<1-2 sentence operator-readable summary + any caveat>\"\n}\n```\n\n## Carry-over rules from the package-level generate-linkedin-post skill\n\nPrompt patterns mirror the package-level `generate-linkedin-post` skill\nbehavior while keeping this agent self-contained. These rules are part of the agent's own configuration, not a mounted skill, so\nthe OAS declares no skill ids:\n\n- Sound polished, concise, and native to LinkedIn.\n- Start with one catchy opening sentence that acts as the hook.\n- Keep the overall post compact.\n- Include the provided blog post URL exactly once as the final line.\n- Do not repeat the blog post title at the end of the post.\n- Avoid hashtags unless they are genuinely useful, and never mention\n  transcript origins, prompt instructions, or AI systems.",
             "user": "Write a promotional LinkedIn post from the following inputs.\nInputs:\n- postTitle: {{ postTitle }}\n- blogPostUrl: {{ blogPostUrl }}\n- companyUrl: {{ companyUrl }}\n- postExcerpt: {{ postExcerpt }}\n- blogPostContent: {{ blogPostContent }}\n- destinationType: {{ destinationType }}\n- destinationName: {{ destinationName }}",
             "agent_run_id": "{{ agent_run_id }}",
             "cinatra_llm": {
@@ -3616,7 +3619,7 @@
               "riskClass": "read_only",
               "requiresApproval": false,
               "packageName": "@cinatra-ai/blog-linkedin-writer-agent",
-              "description": "Single ApiNode \u2192 /api/llm-bridge. The bridge auto-discovers SKILL.md from this agent's own skills/blog-linkedin-writer-agent/SKILL.md via agent_id (same convention as blog-draft-writer-agent). metadata.cinatra.toolboxes INTENTIONALLY OMITTED \u2014 pure LLM-only generation leaf, no web_search, no MCP. SKILL.md content was relocated from packages/asset-blog/skills/generate-linkedin-post. NO skill-id declarations anywhere (owner law: no skill-id field)."
+              "description": "Single ApiNode \u2192 /api/llm-bridge. The agent's operating instructions are inline in data.system (no embedded skill bundle). Single bridge invocation; no toolbox is declared, so platform default-toolbox injection applies. No skill-id declarations are used."
             }
           }
         },

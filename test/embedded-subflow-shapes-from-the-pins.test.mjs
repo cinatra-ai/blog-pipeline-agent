@@ -160,3 +160,116 @@ test("every input the run starts from is one the person is asked for, or a hidde
     "required or hidden names an input the start node does not declare",
   );
 });
+
+test("#3033: every agent edge's range admits the child version the run embeds", () => {
+  // The host refuses an embedded child's tool call (edge-constraint-unmet) when
+  // the parent's declared range does not include the installed child's version.
+  // `^0.1.0` admitted none of the draft writer 0.2.x, the idea generator 0.2.x or
+  // the LinkedIn writer 0.2.x. The draft writer 0.2.2 and the image generator
+  // 0.1.4 are the first versions that declare `brand_voice_text` embeddable,
+  // which the embedded `read_brand_voice` steps call.
+  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  const ranges = Object.fromEntries(
+    pkg.cinatra.dependencies
+      .filter((d) => d.kind === "agent")
+      .map((d) => [d.packageName, d.versionConstraint]),
+  );
+  const caret = (range) => ({ kind: "semver-range", range });
+  assert.deepEqual(ranges, {
+    "@cinatra-ai/blog-draft-writer-agent": caret("^0.2.2"),
+    "@cinatra-ai/blog-idea-generator-agent": caret("^0.2.0"),
+    "@cinatra-ai/blog-image-generator-agent": caret("^0.1.4"),
+    "@cinatra-ai/blog-linkedin-writer-agent": caret("^0.2.0"),
+    "@cinatra-ai/context-selection-agent": caret("^0.1.1"),
+  });
+});
+
+// The host checks an edge with `semver.satisfies(version, range,
+// { includePrerelease: true })` (cinatra packages/registries/src/version-compare.ts
+// `satisfiesVersionRange`). This pack has no semver dependency, so this is that
+// rule for the only form its edges use: a caret range over a plain X.Y.Z
+// version. `^0.0.z` admits only 0.0.z, `^0.y.z` admits >=0.y.z <0.(y+1).0, and
+// `^x.y.z` (x >= 1) admits >=x.y.z <(x+1).0.0. Anything else is refused here,
+// so a new range form fails this test instead of being misread.
+const PLAIN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+function caretSatisfies(version, range) {
+  const v = PLAIN.exec(version);
+  const r = range.startsWith("^") ? PLAIN.exec(range.slice(1)) : null;
+  if (!v || !r) throw new Error(`unsupported version ${version} or range ${range}`);
+  const [vx, vy, vz] = v.slice(1).map(Number);
+  const [rx, ry, rz] = r.slice(1).map(Number);
+  const below = vx - rx || vy - ry || vz - rz;
+  if (below < 0) return false;
+  if (rx > 0) return vx === rx;
+  if (ry > 0) return vx === 0 && vy === ry;
+  return vx === 0 && vy === 0 && vz === rz;
+}
+
+test("the caret rule matches semver's on the cases that matter here", () => {
+  assert.equal(caretSatisfies("0.1.0", "^0.2.0"), false);
+  assert.equal(caretSatisfies("0.2.0", "^0.2.0"), true);
+  assert.equal(caretSatisfies("0.2.9", "^0.2.0"), true);
+  assert.equal(caretSatisfies("0.3.0", "^0.2.0"), false);
+  assert.equal(caretSatisfies("0.2.1", "^0.2.2"), false);
+  assert.equal(caretSatisfies("0.0.3", "^0.0.3"), true);
+  assert.equal(caretSatisfies("0.0.4", "^0.0.3"), false);
+  assert.equal(caretSatisfies("1.4.0", "^1.2.0"), true);
+  assert.equal(caretSatisfies("2.0.0", "^1.2.0"), false);
+});
+
+test("#3033: every embedded child declares a version its agent edge admits", () => {
+  // The finding on #89: the LinkedIn edge was widened to ^0.2.0 while the
+  // embedded LinkedIn flow still declared 0.1.0, a version outside the range.
+  // Every embedded child flow must name its package, be an agent edge of this
+  // pack, and declare the version it was copied from, inside that edge's range.
+  const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  const edges = new Map(
+    pkg.cinatra.dependencies
+      .filter((d) => d.kind === "agent")
+      .map((d) => [d.packageName, d.versionConstraint]),
+  );
+  const embedded = Object.values(components).filter(
+    (c) => c.component_type === "Flow" && c.metadata?.cinatra?.packageName,
+  );
+  assert.deepEqual(
+    embedded.map((c) => c.id).sort(),
+    [
+      "blog-draft-writer-agent-subflow",
+      "blog-image-generator-agent-subflow",
+      "blog-linkedin-writer-agent-subflow",
+    ],
+  );
+  for (const flow of embedded) {
+    const { packageName, packageVersion } = flow.metadata.cinatra;
+    const edge = edges.get(packageName);
+    assert.ok(edge, `${flow.id} embeds ${packageName}, which is not an agent edge`);
+    assert.equal(edge.kind, "semver-range", `${packageName}: edge is not a semver range`);
+    assert.equal(typeof packageVersion, "string", `${flow.id} declares no packageVersion`);
+    assert.ok(
+      caretSatisfies(packageVersion, edge.range),
+      `${flow.id} declares ${packageVersion}, outside its edge's range ${edge.range}`,
+    );
+  }
+});
+
+test("#3033: the embedded LinkedIn writer step carries its 0.2.0 pin's node", () => {
+  // The step is a verbatim copy of the child's `write` node at 0.2.0
+  // (blog-linkedin-writer-agent ce519f59), apart from its prefixed id. That
+  // node has no SKILL.md any more: its instructions are inline and it joins
+  // no toolbox.
+  const sub = components["blog-linkedin-writer-agent-subflow"];
+  const write = sub.$referenced_components["blog-linkedin-writer-agent__write"];
+  assert.ok(write, "the embedded LinkedIn writer has no write step");
+  assert.deepEqual(write.data.toolbox_ids, []);
+  assert.deepEqual(
+    everyText(write).filter((t) => t.includes("SKILL.md")).map(shorten),
+    [],
+    "the embedded LinkedIn writer still carries its 0.1.0 SKILL.md prompt",
+  );
+  assert.ok(
+    write.data.system.startsWith(
+      "You are a stateless blog LinkedIn writer agent. No toolbox joins this turn:",
+    ),
+    "the embedded LinkedIn writer's prompt is not its 0.2.0 pin's",
+  );
+});
