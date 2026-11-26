@@ -27,12 +27,26 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { extensionTool } from "../cinatra/tools/stored-ideas.mjs";
-import {
-  IDEA_TAKEN_REASON,
-  offerStoredIdeas,
-  resolveIdeaPick,
-  titleFromIdeaText,
-} from "../src/lib/blog/stored-ideas-gate.ts";
+
+// The sentences the module ends a run with, written out here so the suite pins
+// them; the module owns no export of them.
+const IDEA_TAKEN_REASON =
+  "That blog idea was just taken by another run. The list has been refreshed — pick another one.";
+const EMPTY_LIST_REASON =
+  "There is no blog idea left to draft: every stored idea already has a draft or is reserved by " +
+  "another run. This list was read when the run reached this step, and it does not change while the " +
+  "run waits here. Generate new ideas; the next run of this pipeline offers them.";
+const NO_LIST_REASON =
+  "The idea gate has no offered list to validate a pick against, so no idea can be taken. " +
+  "The run stops rather than drafting an idea nobody chose.";
+const NOTHING_PICKED_REASON =
+  "No blog idea was chosen at the idea gate. Pick exactly one idea from the list — nothing " +
+  "is chosen for you.";
+const notOfferedReason = (artifactId, offeredCount) =>
+  `The chosen idea (${artifactId}) is not one of the ${offeredCount} ideas the ` +
+  "gate offered, or it has been rewritten since the list was drawn. Refresh the list and pick again.";
+// The title is the first line of the idea's text, without the generator's `Title:` prefix.
+const TITLE_B = "Reading a run's own page";
 
 const TABLE = "idea_claims";
 const IDEA_TYPE = "@cinatra-ai/blog-idea-artifact:blog-idea";
@@ -282,7 +296,7 @@ describe("op prepare", () => {
       [IDEA_B.artifactId],
       "the reserved idea is off the list",
     );
-    assert.equal(result.ideas[0].title, titleFromIdeaText(IDEA_B.text));
+    assert.equal(result.ideas[0].title, TITLE_B);
     assert.equal(result.ideas[0].representationRevisionId, IDEA_B.latestRepresentationRevisionId);
     // ONE CONTENT READ PER UNUSED IDEA, and none for an idea already taken.
     const reads = p.calls.filter((c) => c.operation === "artifact_content_read");
@@ -312,8 +326,8 @@ describe("op prepare", () => {
     assert.deepEqual(result.ideas, []);
     assert.equal(
       result.reason,
-      offerStoredIdeas({ candidates: [], takenArtifactIds: [] }).reason,
-      "the sentence the gate's own decision module ends the run with",
+      EMPTY_LIST_REASON,
+      "the sentence the gate ends the run with",
     );
   });
 
@@ -369,7 +383,7 @@ describe("op reserve", () => {
     {
       artifactId: IDEA_B.artifactId,
       representationRevisionId: IDEA_B.latestRepresentationRevisionId,
-      title: titleFromIdeaText(IDEA_B.text),
+      title: TITLE_B,
       text: IDEA_B.text,
     },
   ];
@@ -389,7 +403,7 @@ describe("op reserve", () => {
       claimId: p.rows[0].claim_id,
       ideaArtifactId: IDEA_B.artifactId,
       ideaRevisionId: IDEA_B.latestRepresentationRevisionId,
-      ideaTitle: titleFromIdeaText(IDEA_B.text),
+      ideaTitle: TITLE_B,
       reason: "",
     });
     const write = p.calls.find((c) => c.operation === "insertIfAbsent");
@@ -434,11 +448,8 @@ describe("op reserve", () => {
     });
     assert.equal(
       result.reason,
-      resolveIdeaPick({
-        pick: JSON.stringify({ artifactId: "idea-z", representationRevisionId: "rev-z" }),
-        offered,
-      }).reason,
-      "the sentence the gate's own decision module refuses the pick with",
+      notOfferedReason("idea-z", offered.length),
+      "the sentence the gate refuses the pick with",
     );
     assert.deepEqual(p.calls, []);
   });
@@ -449,7 +460,7 @@ describe("op reserve", () => {
       input: { op: "reserve", ideaType: IDEA_TYPE, pick, offered: "not json at all" },
       ports: p,
     });
-    assert.equal(result.reason, resolveIdeaPick({ pick, offered: [] }).reason);
+    assert.equal(result.reason, NO_LIST_REASON);
     assert.deepEqual(p.calls, []);
   });
 
@@ -459,7 +470,7 @@ describe("op reserve", () => {
       input: { op: "reserve", ideaType: IDEA_TYPE, pick: "", offered: JSON.stringify(offered) },
       ports: p,
     });
-    assert.equal(result.reason, resolveIdeaPick({ pick: "", offered }).reason);
+    assert.equal(result.reason, NOTHING_PICKED_REASON);
     assert.deepEqual(p.calls, []);
   });
 });
@@ -619,7 +630,7 @@ describe("a run launched with no scope", () => {
     assert.deepEqual(result, {
       ok: false,
       ideas: [],
-      reason: offerStoredIdeas({ candidates: [], takenArtifactIds: [] }).reason,
+      reason: EMPTY_LIST_REASON,
     });
   });
 
@@ -628,7 +639,7 @@ describe("a run launched with no scope", () => {
       {
         artifactId: IDEA_B.artifactId,
         representationRevisionId: IDEA_B.latestRepresentationRevisionId,
-        title: titleFromIdeaText(IDEA_B.text),
+        title: TITLE_B,
         text: IDEA_B.text,
       },
     ];
